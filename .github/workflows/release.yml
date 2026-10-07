@@ -4,6 +4,7 @@ name: release
 # released. The merged PR's source branch picks the bump:
 #   feature/* or feat/*  -> minor (0.1.0 -> 0.2.0)
 #   anything else        -> patch (0.1.0 -> 0.1.1)
+#   release/X.Y.Z        -> exactly vX.Y.Z (for a new major such as 1.0.0, which bumps can't reach)
 # After the tag is created, the version is written into the files (bot commit), the
 # tags are moved onto that commit, and a GitHub release is published from CHANGELOG.md.
 #
@@ -46,29 +47,46 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Exact version from a release/X.Y.Z branch
+        id: exact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          src=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].head.ref // ""')
+          if [[ "$src" =~ ^release/v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            v="v${BASH_REMATCH[1]}"
+            if git rev-parse -q --verify "refs/tags/$v" >/dev/null; then
+              echo "::error::tag $v already exists"; exit 1
+            fi
+            echo "version=$v" >> "$GITHUB_OUTPUT"
+            echo "Exact release $v from $src" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Version
         id: version
+        if: steps.exact.outputs.version == ''
         uses: TheKathan/trunk-semver@bdfa679941c534feeb98f967803cff48cdc3455e # v1.0.14
         with:
-          major-version: "0"
+          major-version: "1"
           add-to-summary: "true"
 
       - name: Write the version into the files and move the tags onto that commit
         id: bump
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.exact.outputs.version || steps.version.outputs.version }}
         run: |
           set -euo pipefail
           python3 scripts/set_version.py "$VERSION"
           python3 scripts/set_version.py --check
-          if git diff --quiet; then
-            echo "files already at $VERSION"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(release): $VERSION"
-          git push origin HEAD:main
+          if git diff --quiet; then
+            echo "files already at $VERSION"
+          else
+            git commit -am "chore(release): $VERSION"
+            git push origin HEAD:main
+          fi
           MAJOR="${VERSION%%.*}"
           git tag -f "$VERSION"
           git tag -f "$MAJOR"
@@ -77,7 +95,7 @@ jobs:
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.exact.outputs.version || steps.version.outputs.version }}
         run: |
           set -euo pipefail
           if gh release view "$VERSION" >/dev/null 2>&1; then

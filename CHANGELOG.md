@@ -4,6 +4,15 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+**baton 1.0: the first stable release.** It brings together the 0.4–0.8 work: one board across git worktrees, a documented and versioned board format, the MCP server, `baton metrics` and the `baton serve` dashboard.
+
+### Stability
+- Semantic versioning from here on. Within 1.x, commands, flags, MCP tool names and arguments are only added, never renamed or removed. Every 1.x release reads every older board ([docs/FORMAT.md](docs/FORMAT.md)).
+
+### Changed
+- Releases count from `v1`: install with `#v1` or `@v1`, or pin `#semver:^1.0.0`. `v0` stays on the last 0.x release.
+- The release workflow can release an exact version from a `release/X.Y.Z` branch, which a bump can't reach for a new major.
+
 ## [0.8.0] - 2026-10-07
 
 ### Added
