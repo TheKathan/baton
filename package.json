@@ -1,0 +1,40 @@
+{
+  "name": "agent-baton",
+  "version": "0.1.0",
+  "description": "A file-based, append-only coordination board for AI agents building software together",
+  "private": true,
+  "license": "MIT",
+  "author": "Gonçalo Faria",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/TheKathan/baton.git"
+  },
+  "bin": {
+    "baton": "bin/baton"
+  },
+  "files": [
+    "bin/",
+    "src/baton/**/*.py",
+    "src/baton/skill/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "make test"
+  },
+  "keywords": [
+    "ai-agents",
+    "coordination",
+    "multi-agent",
+    "cli",
+    "claude-code"
+  ]
+}

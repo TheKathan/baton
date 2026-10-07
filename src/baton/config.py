@@ -1,4 +1,4 @@
-"""Project configuration: `.baton.json` at the project root."""
+"""Project configuration: `.baton/config.json` at the project root."""
 
 from __future__ import annotations
 
@@ -6,15 +6,16 @@ import json
 import os
 from pathlib import Path
 
-CONFIG_NAME = ".baton.json"
+BATON_DIR = ".baton"
+CONFIG_NAME = f"{BATON_DIR}/config.json"
 
 DEFAULTS: dict = {
-    "dir": "coordination/bbs",
+    "dir": ".baton/events",
     "sprint": "S1",
-    "board_md": "coordination/BOARD.md",
-    "archive_dir": "coordination/board-archive",
-    "status_md": "coordination/STATUS.md",
-    "contracts_index": "coordination/board-archive/CONTRACTS-INDEX.md",
+    "board_md": ".baton/BOARD.md",
+    "archive_dir": ".baton/archive",
+    "status_md": ".baton/STATUS.md",
+    "contracts_index": ".baton/CONTRACTS-INDEX.md",
     "kinds": {
         "Q": "question",
         "C": "contract change",
@@ -36,7 +37,7 @@ class ConfigError(Exception):
 
 
 def find_root(start: Path | None = None) -> Path:
-    """Return the project root: $BATON_ROOT, or the nearest parent holding .baton.json."""
+    """Return the project root: $BATON_ROOT, or the nearest parent holding .baton/config.json."""
     env = os.environ.get("BATON_ROOT")
     if env:
         root = Path(env).resolve()
@@ -58,4 +59,5 @@ def load(root: Path) -> dict:
 
 
 def save(root: Path, cfg: dict) -> None:
+    (root / BATON_DIR).mkdir(parents=True, exist_ok=True)
     (root / CONFIG_NAME).write_text(json.dumps(cfg, indent=2) + "\n")

@@ -228,6 +228,11 @@ class Board:
             out.append(t)
         return out
 
+    def maybe_settled(self, role: str) -> list[dict]:
+        """Open threads the role started that someone else has since replied to: probably settled."""
+        return [t for t in self.open_threads(role) if t["from"] == role
+                and t["kind"] in ("Q", "B") and any(r["from"] != role for r in t["replies"])]
+
     def awaiting(self, role: str) -> list[dict]:
         """Open Q/B threads addressed to the role (by name) that the role has not answered."""
         return [t for t in self.open_threads(role, ["Q", "B"], named_only=True)

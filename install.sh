@@ -7,8 +7,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="${BATON_BIN_DIR:-$HOME/.local/bin}"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
-  if command -v uv >/dev/null && uv tool list 2>/dev/null | grep -q '^baton '; then uv tool uninstall baton; fi
-  if command -v pipx >/dev/null && pipx list --short 2>/dev/null | grep -q '^baton '; then pipx uninstall baton; fi
+  if command -v uv >/dev/null && uv tool list 2>/dev/null | grep -q '^agent-baton '; then uv tool uninstall agent-baton; fi
+  if command -v pipx >/dev/null && pipx list --short 2>/dev/null | grep -q '^agent-baton '; then pipx uninstall agent-baton; fi
   if [[ -L "$BIN/baton" ]]; then rm "$BIN/baton"; fi
   echo "baton uninstalled"
   exit 0

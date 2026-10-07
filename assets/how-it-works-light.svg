@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520" role="img" aria-labelledby="t d">
+  <title id="t">How baton works</title>
+  <desc id="d">Agents (orchestrator, backend, frontend, qa) run baton post, reply, handoff and unread. These append to .baton/events/&lt;sprint&gt;.jsonl under a lock; it is the source of truth. baton renders .baton/BOARD.md, .baton/STATUS.md, .baton/archive/BOARD-&lt;sprint&gt;.md and .baton/CONTRACTS-INDEX.md from it. Per-agent cursors mean each agent reads each event once.</desc>
+  <rect x="0.5" y="0.5" width="1199" height="519" rx="16" fill="#F6F8FA" stroke="#D0D7DE"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#59636E"/></marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#3B5BDB"/></marker></defs>
+  <text x="40" y="56" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">1  AGENTS</text>
+  <text x="440" y="56" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">2  SOURCE OF TRUTH</text>
+  <text x="864" y="56" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">3  GENERATED VIEWS</text>
+  <rect x="40" y="84" width="220" height="48" rx="12" fill="#EDF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+  <circle cx="64" cy="108" r="5" fill="#3B5BDB"/>
+  <text x="80" y="114" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#1F2328" text-anchor="start">orchestrator</text>
+  <rect x="40" y="148" width="220" height="48" rx="12" fill="#EDF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+  <circle cx="64" cy="172" r="5" fill="#3B5BDB"/>
+  <text x="80" y="178" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#1F2328" text-anchor="start">backend</text>
+  <rect x="40" y="212" width="220" height="48" rx="12" fill="#EDF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+  <circle cx="64" cy="236" r="5" fill="#3B5BDB"/>
+  <text x="80" y="242" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#1F2328" text-anchor="start">frontend</text>
+  <rect x="40" y="276" width="220" height="48" rx="12" fill="#EDF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+  <circle cx="64" cy="300" r="5" fill="#3B5BDB"/>
+  <text x="80" y="306" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#1F2328" text-anchor="start">qa</text>
+  <text x="40" y="368" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#59636E" text-anchor="start">+ the human owner</text>
+  <line x1="270" y1="196" x2="430" y2="196" stroke="#59636E" stroke-width="2" marker-end="url(#a)"/>
+  <text x="350" y="150" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="15" font-weight="400" fill="#1F2328" text-anchor="middle">post · reply</text>
+  <text x="350" y="174" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="15" font-weight="400" fill="#1F2328" text-anchor="middle">handoff · unread</text>
+  <text x="350" y="224" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636E" text-anchor="middle">baton commands</text>
+  <rect x="440" y="84" width="344" height="240" rx="12" fill="#FFFFFF" stroke="#F76707" stroke-width="1.5"/>
+  <text x="460" y="116" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="16" font-weight="700" fill="#1F2328" text-anchor="start">.baton/events/&lt;sprint&gt;.jsonl</text>
+  <rect x="460" y="136" width="304" height="26" rx="6" fill="#F6F8FA"/>
+  <text x="472" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">H-233</text>
+  <text x="536" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="400" fill="#1F2328" text-anchor="start">backend → qa</text>
+  <rect x="460" y="170" width="304" height="26" rx="6" fill="#F6F8FA"/>
+  <text x="472" y="188" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">Q-234</text>
+  <text x="536" y="188" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="400" fill="#1F2328" text-anchor="start">frontend → backend</text>
+  <rect x="460" y="204" width="304" height="26" rx="6" fill="#F6F8FA"/>
+  <text x="472" y="222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="700" fill="#59636E" text-anchor="start">C-235</text>
+  <text x="536" y="222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="400" fill="#1F2328" text-anchor="start">backend → all</text>
+  <rect x="460" y="238" width="304" height="26" rx="6" fill="#FFF4E6"/>
+  <text x="472" y="256" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="700" fill="#C2410C" text-anchor="start">Q-236</text>
+  <text x="536" y="256" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="14" font-weight="400" fill="#1F2328" text-anchor="start">qa → frontend</text>
+  <text x="472" y="300" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636E" text-anchor="start">↓ append-only · flock · ids never reused</text>
+  <line x1="794" y1="196" x2="854" y2="196" stroke="#59636E" stroke-width="2" marker-end="url(#a)"/>
+  <text x="824" y="184" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636E" text-anchor="middle">render</text>
+  <rect x="864" y="84" width="296" height="48" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="884" y="114" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="16" font-weight="400" fill="#1F2328" text-anchor="start">.baton/BOARD.md</text>
+  <rect x="864" y="148" width="296" height="48" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="884" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="16" font-weight="400" fill="#1F2328" text-anchor="start">.baton/STATUS.md</text>
+  <rect x="864" y="212" width="296" height="48" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="884" y="242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="13" font-weight="400" fill="#1F2328" text-anchor="start">.baton/archive/BOARD-&lt;sprint&gt;.md</text>
+  <rect x="864" y="276" width="296" height="48" rx="12" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+  <text x="884" y="306" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="16" font-weight="400" fill="#1F2328" text-anchor="start">.baton/CONTRACTS-INDEX.md</text>
+  <text x="864" y="368" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#59636E" text-anchor="start">read-only: rewritten after every write</text>
+  <path d="M612 324 V 440 H 236 V 342" fill="none" stroke="#3B5BDB" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#b)"/>
+  <rect x="300" y="418" width="436" height="44" rx="22" fill="#F6F8FA" stroke="#3B5BDB" stroke-width="1.5"/>
+  <text x="518" y="446" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#1F2328" text-anchor="middle">cursors: each agent reads each event once</text>
+  <text x="864" y="446" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="15" font-weight="400" fill="#59636E" text-anchor="start">Ask by id: baton show Q-236</text>
+</svg>

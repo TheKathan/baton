@@ -18,12 +18,19 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 ## Layout
 | Path | What it holds |
 |---|---|
-| `src/baton/config.py` | `.baton.json` discovery and defaults |
+| `src/baton/config.py` | `.baton/config.json` discovery and defaults |
 | `src/baton/store.py` | the locked event store, folding events into threads, cursors, status rows |
 | `src/baton/render.py` | the generated Markdown views |
 | `src/baton/importer.py` | import of hand-written Markdown boards |
 | `src/baton/cli.py` | commands and argument parsing |
 | `bin/baton` | a shim that runs from a checkout without installing |
+
+## Branches and releases
+- Never push to `main`. Open a pull request from a branch whose name picks the version bump ([trunk-semver](https://github.com/TheKathan/trunk-semver)):
+  - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v0.2.0` → `v0.3.0`);
+  - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version.
+- Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
+- Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
 ## Commits and pull requests
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat(store): …`, `fix(render): …`, `docs: …`.

@@ -2,6 +2,27 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Everything now lives in one `.baton/` folder: `.baton/config.json` (was `.baton.json`), `.baton/events/<sprint>.jsonl`, and the generated `.baton/BOARD.md`, `.baton/STATUS.md`, `.baton/archive/` and `.baton/CONTRACTS-INDEX.md` (previously under `coordination/`).
+- `open --as <role>` lists only threads that name the role; `--all` adds broadcasts.
+
+### Added
+- `brief` and `stats` commands; length warnings for C/D entries; a note when one `unread` is unusually large.
+- The **agent skill** (`src/baton/skill/SKILL.md`, Claude Code format) and `baton skill install|show|path` (`--project`, `--dir`, `--force`). Evaluated with skill-creator: 3 tasks × with/without skill (see `evals/`).
+- npm install straight from git: `package.json` with a `baton` bin (`npm i -g` / `npm i -D "git+ssh://…#semver:^0.2.0"`, `npx baton`). The launcher checks for Python ≥ 3.11.
+- Release workflow on TheKathan/trunk-semver: merging a PR tags `vX.Y.Z` (feature/* → minor, else patch) plus a moving `v0`, syncs the version into the files, and publishes a GitHub release from this changelog. `scripts/set_version.py` keeps the versions consistent.
+
+### Fixed
+- Message text after options is accepted on Python 3.11 (argparse could not handle a `*` positional placed after options).
+- `handoff --closes` resolves every id before writing, so a bad id no longer leaves a posted hand-off behind (agents then retried and duplicated it). Already-closed threads are noted, not an error.
+- `close --sprint` keeps unanswered questions/blockers and live contracts open (`--include-unanswered`, `--include-contracts` to override).
+- `sprint` refuses names without a digit (e.g. `baton sprint new`) unless `--force`.
+- `handoff` and `brief` point out threads you started that someone has replied to (probably settled: close them).
+- `brief --ids` skips ids that aren't board entries (e.g. story ids) instead of failing.
+- The package is named `agent-baton` (PyPI/npm name); the command stays `baton`.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added
