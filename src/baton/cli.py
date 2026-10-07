@@ -432,8 +432,12 @@ def cmd_skill(args) -> None:
 
 
 def cmd_where(args) -> None:
-    board = _board(args)
-    print(json.dumps({"root": str(board.root), **board.cfg}, indent=2))
+    root, worktree = config.locate()
+    board = Board(root, config.load(root))
+    info = {"root": str(board.root)}
+    if worktree:
+        info["shared_from_worktree"] = str(worktree)
+    print(json.dumps({**info, **board.cfg}, indent=2))
 
 
 # ---------------- parser ----------------
