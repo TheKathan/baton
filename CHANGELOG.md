@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **The dashboard shows the full metrics**: a Metrics section with time to first answer and time to close (median, p90, n), opened vs closed by kind, questions answered, stale threads with their ids, and the total unread backlog. The sprint and role tables add token cost (~tokens per sprint; unread events and ~tokens per role). `baton metrics` and `/api/metrics.json` carry the same token numbers.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added

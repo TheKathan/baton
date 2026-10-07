@@ -141,7 +141,7 @@ baton metrics                # board health; --sprint S7, --json, --stale 36h
 baton open --stale 2d        # open threads nobody has touched for two days
 ```
 
-The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts, the status table and per-sprint and per-role metrics. It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. `baton metrics` reports the time to first answer and the time to close (median and p90), opened vs closed, unanswered questions and blockers, stale threads, and each role's load. The same numbers are at `/api/metrics.json`.
+The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts and the status table, plus a **Metrics** section: answer and close times (median and p90), opened vs closed, stale threads, and per-sprint and per-role numbers including token cost. It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. `baton metrics` reports the time to first answer and the time to close (median and p90), opened vs closed, unanswered questions and blockers, stale threads, and each role's load. The same numbers are at `/api/metrics.json`.
 
 ## Use it from MCP clients
 
