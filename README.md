@@ -37,6 +37,8 @@ Agents run the `baton` command. It appends one event per line to a JSONL file un
 
 The `.md` files are generated and rewritten after every write, so never edit them by hand.
 
+Agents working in **git worktrees** share one board: inside a linked worktree, baton uses the main worktree's `.baton/`, so every agent gets ids from the same counter under the same lock. Commit the board from the main worktree.
+
 ## Install
 
 ```bash
@@ -154,6 +156,7 @@ Why use it: in our evals, agents with the skill closed the threads they had sett
 | `unread_warn_tokens` | `20000` | Note a very large `unread`; `0` turns it off |
 | `id_width` | `3` | Id zero-padding (`Q-001`) |
 | `auto_render` | `true` | Regenerate the views after every write |
+| `shared_worktrees` | `true` | In a linked git worktree, use the main worktree's board |
 
 The paths of the generated views (`board_md`, `status_md`, `contracts_index`, `archive_dir`) are also keys. `baton where` prints the config in use.
 
