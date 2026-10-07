@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-07
+
 ### Changed
 - npm registry publishing is postponed. Install from GitHub (`npm install -g github:TheKathan/baton#v0`, or `uv tool install "git+https://…@v0"`). `package.json` is private again, and the publish step is removed from the release workflow until it can be enabled.
 
