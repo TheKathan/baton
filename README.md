@@ -6,7 +6,7 @@
   <img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue">
   <img alt="Dependencies: none (stdlib)" src="https://img.shields.io/badge/dependencies-none%20(stdlib)-brightgreen">
   <img alt="Platform: macOS | Linux" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey">
-  <img alt="Version 0.2.1" src="https://img.shields.io/badge/version-0.2.1-blue">
+  <img alt="Version 0.2.2" src="https://img.shields.io/badge/version-0.2.2-blue">
   <img alt="Made for AI agents" src="https://img.shields.io/badge/made%20for-AI%20agents-8A2BE2">
 </p>
 

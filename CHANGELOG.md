@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-07
+
 ### Security
 - `CODEOWNERS`, and repository rulesets on `main` (code-owner approval, passing tests, no force-push or deletion) and on `v*` tags (release deploy key only).
 - The release workflow pushes through a deploy key held in a `release` environment that only `main` can use.
