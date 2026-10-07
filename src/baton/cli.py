@@ -460,6 +460,23 @@ def cmd_migrate(args) -> None:
     print(f"recorded format {SCHEMA_VERSION} in {config.CONFIG_NAME}; event files are never rewritten")
 
 
+def cmd_mcp(args) -> None:
+    """Run the MCP server on stdio, or register it in the project's .mcp.json."""
+    from . import mcp
+    if args.action == "serve":
+        mcp.serve()
+        return
+    try:
+        base = config.find_root()
+    except config.ConfigError:
+        base = Path.cwd()
+    path = Path(args.file).expanduser() if args.file else base / ".mcp.json"
+    if mcp.install(path, args.command):
+        print(f"registered the baton MCP server in {path} ({args.command} mcp)")
+    else:
+        print(f"{path} already registers the baton MCP server")
+
+
 def cmd_where(args) -> None:
     root, worktree = config.locate()
     board = Board(root, config.load(root))
@@ -584,6 +601,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("migrate", cmd_migrate, "check the board's on-disk format and record the current one")
     sp.add_argument("--check", action="store_true", help="only report; change nothing")
+
+    sp = add("mcp", cmd_mcp, "run the MCP server on stdio, or `mcp install` to register it in .mcp.json")
+    sp.add_argument("action", choices=["serve", "install"], nargs="?", default="serve")
+    sp.add_argument("--command", default="baton", help="command MCP clients run (default: baton)")
+    sp.add_argument("--file", help="the .mcp.json to update (default: the project's)")
 
     add("where", cmd_where, "print the project root and config")
     add("guide", lambda a: print(GUIDE), "print the agent quick guide")

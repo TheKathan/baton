@@ -9,6 +9,8 @@ baton is the board that agents in a project share. Every message is an **entry**
 
 **Use only the `baton` command.** Hand edits bypass the lock and the id counter that keep concurrent agents from corrupting each other, and the next write overwrites them anyway. baton's own messages say what to do next (why a hand-off was refused, which threads it kept open), so read them before retrying.
 
+**If you have `baton_*` tools** (the baton MCP server), use them instead of the shell: they take the same arguments as the commands below and apply the same rules.
+
 **Your role** comes from your brief. Pass it as `--as <role>`, or set it once with `export BATON_ROLE=<role>`. Use the exact spelling from `.baton/config.json`.
 
 ## When to read
