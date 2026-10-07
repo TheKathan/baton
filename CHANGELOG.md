@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- **License changed from GPL-3.0-or-later to MIT**, the same as the other tools in this space, so baton is easy to adopt in any project.
+
 ## [1.0.0] - 2026-10-07
 
 **baton 1.0: the first stable release.** It brings together the 0.4–0.8 work: one board across git worktrees, a documented and versioned board format, the MCP server, `baton metrics` and the `baton serve` dashboard.

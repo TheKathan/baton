@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A file-based, append-only coordination board for AI agents building software together",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "homepage": "https://github.com/TheKathan/baton#readme",
   "bugs": {
     "url": "https://github.com/TheKathan/baton/issues"
