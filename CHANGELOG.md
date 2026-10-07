@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-07
+
 ### Changed
 - Everything now lives in one `.baton/` folder: `.baton/config.json` (was `.baton.json`), `.baton/events/<sprint>.jsonl`, and the generated `.baton/BOARD.md`, `.baton/STATUS.md`, `.baton/archive/` and `.baton/CONTRACTS-INDEX.md` (previously under `coordination/`).
 - `open --as <role>` lists only threads that name the role; `--all` adds broadcasts.
