@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **MCP server: `baton mcp`.** A Model Context Protocol server on stdio, using only the standard library, with typed tools: `baton_brief`, `baton_unread`, `baton_show`, `baton_open`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status`, `baton_grep`. Tools run the same commands in-process, so every rule still applies. The role comes from the `role` argument or `BATON_ROLE`. `baton mcp install` registers it in the project's `.mcp.json` and keeps other servers.
+
 ## [0.5.0] - 2026-10-07
 
 ### Added

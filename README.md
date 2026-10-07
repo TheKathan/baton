@@ -114,6 +114,7 @@ baton --version
 | `render`, `lint`, `stats` | Regenerate the views, check the board, estimate token cost |
 | `import <file>` | Import a Markdown board as one sprint (`--dry-run`) |
 | `skill [install\|show\|path]` | Install or print the agent skill |
+| `mcp [install]` | Run the MCP server on stdio, or register it in `.mcp.json` |
 | `where` | Print the project root and config as JSON |
 | `migrate` | Check the board's on-disk format (`--check`) and record the current one |
 
@@ -130,6 +131,17 @@ baton open --blocking                      # blockers first
 baton close --sprint S1 --as orchestrator  # close settled threads; unanswered Q/B and live contracts stay open
 baton sprint S2                            # archive S1, start S2; open threads carry over
 ```
+
+## Use it from MCP clients
+
+`baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Agents then get typed tools (`baton_brief`, `baton_unread`, `baton_show`, `baton_open`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status`, `baton_grep`) instead of shell commands, so there is no quoting and no guessed flags. The tools apply exactly the same rules as the CLI.
+
+```bash
+baton mcp install                  # adds "baton" to the project's .mcp.json (commit it)
+baton mcp install --command npx    # if baton is a dev dependency (`npx baton mcp`)
+```
+
+Each tool takes a `role` argument, or uses `BATON_ROLE` from the server's environment.
 
 ## The agent skill
 
