@@ -19,10 +19,12 @@ class ReleaseTest(unittest.TestCase):
     def test_set_version_updates_files_and_changelog(self):
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
-            for rel in ("scripts/set_version.py", "src/baton/__init__.py", "package.json", "README.md"):
+            for rel in ("scripts/set_version.py", "src/baton/__init__.py", "package.json"):
                 (t / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(ROOT / rel, t / rel)
             (t / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n### Added\n- thing\n\n## [0.1.0] - 2026-10-07\n- first\n")
+            # the README version badge is optional; when present it is kept in sync
+            (t / "README.md").write_text('<img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-blue">\n')
             script = t / "scripts/set_version.py"
             subprocess.run([sys.executable, str(script), "v0.2.0"], check=True, capture_output=True)
             self.assertIn('__version__ = "0.2.0"', (t / "src/baton/__init__.py").read_text())
@@ -44,6 +46,10 @@ class ReleaseTest(unittest.TestCase):
             pack = subprocess.run(["npm", "pack", "--json", "--pack-destination", tmp], cwd=ROOT, env=env,
                                   capture_output=True, text=True, check=True)
             info = json.loads(pack.stdout)[0]
+            pkg = json.loads((ROOT / "package.json").read_text())
+            self.assertNotIn("private", pkg)  # publishable to npm
+            self.assertEqual(pkg["name"], "agent-baton")
+            self.assertEqual(pkg["bin"], {"baton": "bin/baton"})
             files = {f["path"] for f in info["files"]}
             self.assertIn("bin/baton", files)
             self.assertIn("src/baton/cli.py", files)

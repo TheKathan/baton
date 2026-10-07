@@ -30,6 +30,7 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
   - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v0.2.0` → `v0.3.0`);
   - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version.
 - Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
+- The release also publishes `agent-baton` to npm, with provenance, through npm trusted publishing. No npm token is stored: npmjs.com trusts `TheKathan/baton`, `release.yml` and the `release` environment. Publishing runs only while the `NPM_PUBLISH` repository variable is `true`, and skips a version that is already on npm.
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
 ## What a pull request needs

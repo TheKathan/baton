@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Published on npm as [`agent-baton`](https://www.npmjs.com/package/agent-baton)**: `npm install -g agent-baton`, `npx agent-baton`, or `npm install -D agent-baton`. Releases publish automatically with npm provenance through trusted publishing (no stored npm token), once the `NPM_PUBLISH` repository variable is `true`.
+
+### Changed
+- README reorganised: why baton (its benefits), how it works, then install.
+
 ## [0.2.4] - 2026-10-07
 
 ## [0.2.3] - 2026-10-07
