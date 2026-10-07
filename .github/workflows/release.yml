@@ -1,0 +1,82 @@
+name: release
+
+# Versioning is trunk-based (TheKathan/trunk-semver): every PR merged into main is
+# released. The merged PR's source branch picks the bump:
+#   feature/* or feat/*  -> minor (0.1.0 -> 0.2.0)
+#   anything else        -> patch (0.1.0 -> 0.1.1)
+# After the tag is created, the version is written into the files (bot commit), the
+# tags are moved onto that commit, and a GitHub release is published from CHANGELOG.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    # the bot's own version commit must not release again
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test
+        run: make test
+
+      - name: Version
+        id: version
+        uses: TheKathan/trunk-semver@v1
+        with:
+          major-version: "0"
+          add-to-summary: "true"
+
+      - name: Write the version into the files and move the tags onto that commit
+        id: bump
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/set_version.py "$VERSION"
+          python3 scripts/set_version.py --check
+          if git diff --quiet; then
+            echo "files already at $VERSION"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): $VERSION"
+          git push origin HEAD:main
+          MAJOR="${VERSION%%.*}"
+          git tag -f "$VERSION"
+          git tag -f "$MAJOR"
+          git push --force origin "refs/tags/$VERSION" "refs/tags/$MAJOR"
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "release $VERSION already exists"
+            exit 0
+          fi
+          python3 scripts/set_version.py --notes "$VERSION" > notes.md
+          gh release create "$VERSION" --title "$VERSION" --notes-file notes.md --verify-tag

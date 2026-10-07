@@ -3,6 +3,9 @@
 import sys
 from pathlib import Path
 
+if sys.version_info < (3, 11):
+    sys.exit(f"baton needs Python 3.11 or newer; this is {sys.version.split()[0]} ({sys.executable})")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from baton.cli import main  # noqa: E402
 

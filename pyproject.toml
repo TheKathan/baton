@@ -1,6 +1,6 @@
 [project]
-name = "baton"
-version = "0.1.0"
+name = "agent-baton"
+dynamic = ["version"]
 description = "A file-based, append-only coordination board for AI agents building software together"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,3 +15,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "baton.__version__" }
+
+[tool.setuptools.package-data]
+baton = ["skill/*.md"]

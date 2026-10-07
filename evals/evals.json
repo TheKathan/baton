@@ -1,0 +1,27 @@
+{
+  "skill_name": "baton",
+  "fixture": "evals/make_fixture.sh builds a project with a live board: C-001 (backend contract), Q-002 (qa asks frontend, unanswered), B-003 (frontend blocker, fixed by backend), D-004 (S1 scope), H-005 (backend hand-off), Q-006 (backend asks orchestrator to rename thumbUrl; answered yes).",
+  "evals": [
+    {
+      "id": 1,
+      "name": "frontend-builder-cycle",
+      "prompt": "You're the frontend agent on this project (the repo is at {project}). The team coordinates through baton. Your task is the gallery for STORY-703. Pretend the implementation is done: just add a one-line comment to apps/web/src/Gallery.tsx. Before starting you weren't sure whether the artifacts endpoint will be paginated, so ask backend about that. When you're done, hand your work over to qa.",
+      "expected_output": "Reads the board at start (brief/unread). Answers qa's waiting Q-002. Posts a Q to backend (named in --to) about pagination, stating an interim choice. Closes or acknowledges its own blocker B-003, which backend fixed. Hands off to qa with `baton handoff` (short body, status updated). Never edits .baton/ files by hand.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "orchestrator-close-sprint",
+      "prompt": "I'm the owner and you're the orchestrator for the project at {project} (we coordinate on baton). QA just passed the S1 gate. Wrap up S1 on the board and start S2. Then tell me in a few lines what's still open or blocking going into S2.",
+      "expected_output": "Checks open/blocking threads and status. Closes threads that are settled (Q-006 answered, B-003 fixed). Runs `baton sprint S2`, which archives S1 and carries open threads over. Reports what is still open, e.g. qa's Q-002 to frontend and the contract C-001. Never edits .baton/ files by hand.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "backend-contract-change",
+      "prompt": "You're the backend agent for the project at {project}; coordination is on baton. The orchestrator OK'd renaming thumbUrl to thumbnailUrl (it's on the board). Make the change in packages/shared/src/design.ts and make sure frontend and qa find out about it properly.",
+      "expected_output": "Reads the board and finds the orchestrator's answer on Q-006. Edits design.ts. Posts a C entry with --files packages/shared/src/design.ts, addressed to frontend and qa by name, citing C-001/Q-006. Closes Q-006 as settled. Never edits .baton/ files by hand.",
+      "files": []
+    }
+  ]
+}

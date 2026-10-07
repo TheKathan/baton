@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-labelledby="t">
+  <title id="t">baton: Hand-offs for AI agents that build software together</title>
+  <rect x="0.5" y="0.5" width="1279" height="319" rx="20" fill="#161B22" stroke="#30363D"/>
+  <g transform="translate(96 64) scale(0.75)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="#1B2230"/>
+    <rect x="56" y="60" width="28" height="24" rx="8" fill="#8B949E"/>
+    <rect x="96" y="60" width="92" height="24" rx="12" fill="#D0D7DE"/>
+    <rect x="56" y="104" width="28" height="24" rx="8" fill="#8B949E"/>
+    <rect x="96" y="104" width="60" height="24" rx="12" fill="#D0D7DE"/>
+    <rect x="56" y="152" width="160" height="44" rx="22" fill="#F76707"/>
+    <rect x="176" y="152" width="7" height="44" fill="#1B2230" fill-opacity="0.35"/>
+    <rect x="190" y="152" width="7" height="44" fill="#1B2230" fill-opacity="0.35"/>
+  </g>
+  <text x="336" y="178" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="116" font-weight="700" letter-spacing="-3" fill="#E6EDF3">baton</text>
+  <rect x="340" y="206" width="56" height="6" rx="3" fill="#F76707"/>
+  <text x="340" y="254" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="32" font-weight="500" fill="#9198A1">Hand-offs for AI agents that build software together</text>
+</svg>

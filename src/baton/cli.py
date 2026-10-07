@@ -131,13 +131,30 @@ def cmd_reply(args) -> None:
     print(f"replied to {e['id']}" + (" and closed it" if args.close else ""))
 
 
+def _unanswered(t: dict) -> bool:
+    """A question or blocker that nobody but its author has replied to."""
+    return t["kind"] in ("Q", "B") and not any(r["from"] != t["from"] for r in t["replies"])
+
+
 def cmd_close(args) -> None:
     board = _board(args)
     ids = list(args.ids)
     if args.sprint:
-        ids += [t["id"] for t in board.open_threads() if t["sprint"] == args.sprint]
+        rows = [t for t in board.open_threads() if t["sprint"] == args.sprint]
+        unanswered = [t for t in rows if _unanswered(t) and not args.include_unanswered]
+        contracts = [t for t in rows if t["kind"] == "C" and not args.include_contracts]
+        ids += [t["id"] for t in rows if t not in unanswered and t not in contracts]
+        if unanswered:
+            print("kept open (unanswered question/blocker; answer it, carry it over, or pass "
+                  "--include-unanswered): " + ", ".join(t["id"] for t in unanswered))
+        if contracts:
+            print("kept open (contracts stay live until a newer C- entry supersedes them; close them "
+                  "by id then, or pass --include-contracts): " + ", ".join(t["id"] for t in contracts))
     if not ids:
-        raise BoardError("give entry ids, or --sprint <name> to close every open thread of a sprint")
+        if args.sprint:
+            print("nothing to close")
+            return
+        raise BoardError("give entry ids, or --sprint <name> to close every settled open thread of a sprint")
     for i in ids:
         e = board.close(i, _role(args), args.reason or "")
         print(f"closed {e['id']}")
@@ -212,12 +229,25 @@ def cmd_handoff(args) -> None:
         problems.append("unanswered threads addressed to you: " + ", ".join(t["id"] for t in waiting))
     if problems and not args.force:
         raise BoardError("hand-off refused:\n  - " + "\n  - ".join(problems) + "\n  (use --force with a reason in the body)")
+    # resolve --closes before writing anything, so a bad id never leaves a half-done hand-off behind
+    to_close, already = [], []
+    for i in _csv(args.closes):
+        thread = board.get(i)
+        (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
     t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites))
     board.set_status(role, args.phase, args.state, t["id"])
-    for i in _csv(args.closes):
+    for i in to_close:
         board.close(i, role, f"settled by {t['id']}")
     _after_write(board)
-    print(f"posted {t['id']}; status of {role} set to {args.state!r}")
+    print(f"posted {t['id']}; status of {role} set to {args.state!r}"
+          + (f"; closed {', '.join(to_close)}" if to_close else ""))
+    if already:
+        print(f"note: already closed, left as is: {', '.join(already)}")
+    candidates = board.maybe_settled(role)
+    if candidates:
+        print("note: you started these and someone has replied; close them if they are settled "
+              f"(`baton close <id> --as {role} --reason …`): "
+              + "; ".join(f"{c['id']} (reply from {c['replies'][-1]['from']})" for c in candidates))
 
 
 def cmd_status(args) -> None:
@@ -232,6 +262,9 @@ def cmd_status(args) -> None:
 def cmd_sprint(args) -> None:
     board = _board(args)
     old = board.cfg["sprint"]
+    if not any(c.isdigit() for c in args.new) and not args.force:
+        raise BoardError(f"{args.new!r} does not look like a sprint name (e.g. S2, M1-S3, 2026-W41); "
+                         "pass --force if it really is one")
     if args.new == old:
         raise BoardError(f"{old} is already the current sprint")
     path = render.render_archive(board, old)
@@ -260,7 +293,8 @@ def cmd_import(args) -> None:
     board = _board(args)
     res = import_file(board, Path(args.file), args.sprint, dry_run=args.dry_run)
     verb = "would import" if args.dry_run else "imported"
-    print(f"{verb} {res['entries']} entries from {res['file']} as sprint {res['sprint']}")
+    noun = "entry" if res["entries"] == 1 else "entries"
+    print(f"{verb} {res['entries']} {noun} from {res['file']} as sprint {res['sprint']}")
     for r in res["renamed"]:
         print(f"  duplicate id renamed: {r}")
     if not args.dry_run:
@@ -317,10 +351,25 @@ def cmd_brief(args) -> None:
         out.append(f"## Waiting for your answer ({len(waiting)})\n")
         out += [render.entry_md(t) for t in waiting]
     shown = {t["id"] for t in waiting}
-    cited = [t for t in (board.get(i) for i in _csv(args.ids)) if t["id"] not in shown]
+    cited, unknown = [], []
+    for i in _csv(args.ids):
+        try:
+            t = board.get(i)
+        except BoardError:
+            unknown.append(i)  # e.g. a story or doc id from the brief, not a board entry
+            continue
+        if t["id"] not in shown:
+            cited.append(t)
     if cited:
         out.append("## Entries cited by your brief\n")
         out += [render.entry_md(t) for t in cited]
+    if unknown:
+        out.append(f"Not board entries (skipped): {', '.join(unknown)}\n")
+    candidates = board.maybe_settled(role)
+    if candidates:
+        out.append("## Yours, replied to: close if settled\n")
+        out += [f"- {render.one_line(t)} (last reply from {t['replies'][-1]['from']})" for t in candidates]
+        out.append("")
     _, count = _unread_text(board, role, False, peek=True)
     out.append(f"{count} unread event(s); run `baton unread --as {role}` to read them.")
     print("\n".join(out))
@@ -351,6 +400,37 @@ def cmd_stats(args) -> None:
               f"p90 ~{bodies[int(len(bodies) * 0.9)]}, max ~{bodies[-1]}")
 
 
+def _skill_source() -> str:
+    from importlib.resources import files
+    return (files("baton") / "skill" / "SKILL.md").read_text()
+
+
+def cmd_skill(args) -> None:
+    """Print or install the agent skill that teaches baton (Claude Code skill format)."""
+    text = _skill_source()
+    if args.action == "show":
+        print(text, end="")
+        return
+    if args.dir:
+        base = Path(args.dir).expanduser()
+    elif args.project:
+        try:
+            base = config.find_root() / ".claude" / "skills"
+        except config.ConfigError:
+            base = Path.cwd() / ".claude" / "skills"
+    else:
+        base = Path.home() / ".claude" / "skills"
+    target = base / "baton" / "SKILL.md"
+    if args.action == "path":
+        print(target)
+        return
+    if target.exists() and target.read_text() != text and not args.force:
+        raise BoardError(f"{target} exists and differs (use --force to replace it)")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text)
+    print(f"installed the baton skill to {target}")
+
+
 def cmd_where(args) -> None:
     board = _board(args)
     print(json.dumps({"root": str(board.root), **board.cfg}, indent=2))
@@ -374,7 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("body", nargs="*", help='message text, or "-" to read stdin')
         sp.add_argument("--body-file")
 
-    sp = add("init", cmd_init, "create .baton.json and the board in this project")
+    sp = add("init", cmd_init, "create .baton/ (config and board) in this project")
     sp.add_argument("--sprint", default="S1")
     sp.add_argument("--dir")
     sp.add_argument("--roles", help="comma-separated allowed roles (empty = any)")
@@ -397,7 +477,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("close", cmd_close, "close one or more threads", role=True)
     sp.add_argument("ids", nargs="*")
-    sp.add_argument("--sprint", help="close every open thread of this sprint (e.g. after importing it)")
+    sp.add_argument("--sprint", help="close every settled open thread of this sprint; unanswered Q/B and "
+                                     "contracts stay open")
+    sp.add_argument("--include-unanswered", action="store_true",
+                    help="with --sprint, also close questions and blockers nobody answered")
+    sp.add_argument("--include-contracts", action="store_true",
+                    help="with --sprint, also close contract (C) entries")
     sp.add_argument("--reason")
 
     sp = add("show", cmd_show, "print entries by id, from any sprint")
@@ -436,7 +521,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--handoff")
 
     sp = add("sprint", cmd_sprint, "archive the current sprint and start a new one")
-    sp.add_argument("new")
+    sp.add_argument("new", help="the new sprint's name, e.g. S2")
+    sp.add_argument("--force", action="store_true", help="accept a name without digits")
 
     sp = add("render", cmd_render, "regenerate the Markdown views")
     sp.add_argument("--archives", action="store_true", help="also re-render every past sprint")
@@ -456,6 +542,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--ids", help="comma-separated entries the agent's brief cites")
 
     add("stats", cmd_stats, "estimated token cost per sprint and per role", role=True)
+    sp = add("skill", cmd_skill, "show or install the agent skill (Claude Code format)")
+    sp.add_argument("action", choices=["install", "show", "path"], nargs="?", default="install")
+    sp.add_argument("--project", action="store_true",
+                    help="install into this project's .claude/skills/ instead of ~/.claude/skills/")
+    sp.add_argument("--dir", help="install into <dir>/baton/SKILL.md")
+    sp.add_argument("--force", action="store_true", help="replace a different existing copy")
+
     add("where", cmd_where, "print the project root and config")
     add("guide", lambda a: print(GUIDE), "print the agent quick guide")
     return p

@@ -58,11 +58,11 @@ class BoardTest(unittest.TestCase):
         self.assertIn("posted C-002", run("post", "C", "--as", "backend", "--to", "frontend,qa",
                                           "--title", "Health shape", "--files", "a.ts,b.ts", "-",
                                           stdin="line 1\nline 2\n"))
-        md = (self.root / "coordination/BOARD.md").read_text()
+        md = (self.root / ".baton/BOARD.md").read_text()
         self.assertIn("### [Q-001] backend → frontend · status: OPEN", md)
         self.assertIn("Files: `a.ts`, `b.ts`", md)
         self.assertIn("| C-002 | backend → frontend, qa | Health shape | a.ts; b.ts | S1 | OPEN |",
-                      (self.root / "coordination/board-archive/CONTRACTS-INDEX.md").read_text())
+                      (self.root / ".baton/CONTRACTS-INDEX.md").read_text())
 
     def test_validation(self):
         with self.assertRaises(SystemExit):
@@ -113,7 +113,7 @@ class BoardTest(unittest.TestCase):
                   "--to", "qa", "--title", "done", "--closes", "Q-001", "gates green")
         self.assertIn("posted H-002", out)
         self.assertEqual(self.board().get("Q-001")["status"], "CLOSED")
-        status = (self.root / "coordination/STATUS.md").read_text()
+        status = (self.root / ".baton/STATUS.md").read_text()
         self.assertIn("| backend | S1-A | DONE pending QA | H-002 |", status)
 
     def test_sprint_rollover_archives_and_carries_open_threads(self):
@@ -122,9 +122,9 @@ class BoardTest(unittest.TestCase):
         run("close", "D-002", "--as", "orchestrator")
         run("sprint", "S2")
         self.assertEqual(config.load(self.root)["sprint"], "S2")
-        archive = (self.root / "coordination/board-archive/BOARD-S1.md").read_text()
+        archive = (self.root / ".baton/archive/BOARD-S1.md").read_text()
         self.assertIn("[Q-001]", archive)
-        live = (self.root / "coordination/BOARD.md").read_text()
+        live = (self.root / ".baton/BOARD.md").read_text()
         self.assertIn("Still open from earlier sprints", live)
         self.assertIn("Q-001", live)
         self.assertNotIn("D-002", live)
@@ -138,7 +138,7 @@ class BoardTest(unittest.TestCase):
         ids = [i for b in batches for i in b]
         self.assertEqual(len(ids), 120)
         self.assertEqual(len(set(ids)), 120)
-        evs = [json.loads(ln)["ev"] for ln in (self.root / "coordination/bbs/S1.jsonl").read_text().splitlines()]
+        evs = [json.loads(ln)["ev"] for ln in (self.root / ".baton/events/S1.jsonl").read_text().splitlines()]
         self.assertEqual(sorted(evs), list(range(1, 121)))
         self.assertIn("0 error(s)", run("lint"))
 
@@ -152,7 +152,7 @@ class BoardTest(unittest.TestCase):
             "### [H-212] ai → qa\nno status or date\n\n"
             "### [N-184] frontend → orchestrator · progress · 2026-10-04\nnote kind\n\n"
             "### [H-205] orchestrator (for ai) → backend, qa · status: OPEN · 2026-10-06\nsame number\n")
-        live = self.root / "coordination/BOARD.md"
+        live = self.root / ".baton/BOARD.md"
         live.write_text("# hand-written board\n")
         out = run("import", str(md), "--sprint", "S5")
         self.assertEqual(live.read_text(), "# hand-written board\n")
@@ -160,7 +160,7 @@ class BoardTest(unittest.TestCase):
             run("render")
         live.rename(self.root / "BOARD.pre.md")
         run("render", "--archives")
-        self.assertTrue((self.root / "coordination/board-archive/BOARD-S5.md").exists())
+        self.assertTrue((self.root / ".baton/archive/BOARD-S5.md").exists())
         self.assertIn("imported 5 entries", out)
         b = self.board()
         self.assertEqual(b.get("Q-183")["status"], "CLOSED")
@@ -178,7 +178,8 @@ class BoardTest(unittest.TestCase):
         run("post", "Q", "--as", "backend", "--to", "qa", "--title", "old too", "x")
         run("sprint", "S2")
         run("post", "Q", "--as", "backend", "--to", "qa", "--title", "current", "x")
-        out = run("close", "--sprint", "S1", "--as", "orchestrator", "--reason", "archived")
+        out = run("close", "--sprint", "S1", "--as", "orchestrator", "--reason", "archived",
+                  "--include-unanswered")
         self.assertIn("closed Q-001", out)
         self.assertIn("closed Q-002", out)
         self.assertEqual([t["id"] for t in self.board().open_threads()], ["Q-003"])
@@ -227,6 +228,7 @@ class BoardTest(unittest.TestCase):
         self.assertIn("### [C-001]", out)
         self.assertIn("2 unread event(s)", out)
         self.assertIn("2 unread", run("unread", "--as", "frontend"))
+        self.assertIn("Not board entries (skipped): STORY-703", run("brief", "--as", "frontend", "--ids", "STORY-703,C-1"))
 
     def test_stats_reports_sprints_and_roles(self):
         run("post", "Q", "--as", "backend", "--to", "qa", "--title", "q", "x")
@@ -234,6 +236,84 @@ class BoardTest(unittest.TestCase):
         self.assertIn("S1", out)
         self.assertRegex(out, r"qa\s+1\s+\d+\s+1\s+1")
         self.assertIn("Entry bodies: median", out)
+
+    def test_skill_install_show_and_refuse_to_clobber(self):
+        dest = self.root / "skills"
+        self.assertIn("installed the baton skill", run("skill", "install", "--dir", str(dest)))
+        installed = (dest / "baton" / "SKILL.md").read_text()
+        self.assertTrue(installed.startswith("---\nname: baton\ndescription: "))
+        self.assertEqual(run("skill", "show"), installed)
+        self.assertIn("installed", run("skill", "install", "--dir", str(dest)))  # identical: fine
+        (dest / "baton" / "SKILL.md").write_text("local edits")
+        with self.assertRaises(SystemExit):
+            run("skill", "install", "--dir", str(dest))
+        run("skill", "install", "--dir", str(dest), "--force")
+        self.assertEqual((dest / "baton" / "SKILL.md").read_text(), installed)
+        self.assertEqual(run("skill", "path", "--project").strip(),
+                         str(self.root.resolve() / ".claude/skills/baton/SKILL.md"))
+
+    def test_skill_mentions_only_real_commands(self):
+        import re
+
+        from baton.cli import build_parser
+        text = run("skill", "show")
+        parser = build_parser()
+        sub = next(a for a in parser._actions if a.dest == "cmd")
+        for cmd in set(re.findall(r"`baton ([a-z]+)", text)):
+            self.assertIn(cmd, sub.choices, f"skill mentions unknown command baton {cmd}")
+        for cmd, flag in set(re.findall(r"baton ([a-z]+)[^`\n]*?(--[a-z-]+)", text)):
+            if cmd in sub.choices and flag not in ("--help",):
+                opts = {o for a in sub.choices[cmd]._actions for o in a.option_strings}
+                self.assertIn(flag, opts, f"skill uses unknown flag baton {cmd} {flag}")
+
+    def test_handoff_with_closes_never_duplicates(self):
+        run("post", "Q", "--as", "qa", "--to", "frontend", "--title", "badge?", "x")
+        run("reply", "Q-001", "--as", "frontend", "yes", "--close")
+        run("post", "B", "--as", "frontend", "--to", "backend", "--title", "500 error", "x")
+        out = run("handoff", "--as", "frontend", "--phase", "S1", "--state", "DONE", "--to", "qa",
+                  "--title", "done", "--closes", "Q-001,B-002", "short")
+        self.assertIn("closed B-002", out)
+        self.assertIn("already closed, left as is: Q-001", out)
+        with self.assertRaises(SystemExit):  # unknown id: refused before anything is written
+            run("handoff", "--as", "frontend", "--phase", "S1", "--state", "DONE", "--to", "qa",
+                "--title", "again", "--closes", "Q-099", "short")
+        self.assertEqual([t["id"] for t in self.board().entries().values() if t["kind"] == "H"], ["H-003"])
+
+    def test_close_sprint_keeps_unanswered_questions_open(self):
+        run("post", "Q", "--as", "qa", "--to", "frontend", "--title", "unanswered", "x")
+        run("post", "Q", "--as", "backend", "--to", "orchestrator", "--title", "answered", "x")
+        run("reply", "Q-002", "--as", "orchestrator", "yes")
+        run("post", "B", "--as", "frontend", "--to", "backend", "--title", "self-reply only", "x")
+        run("reply", "B-003", "--as", "frontend", "still broken")
+        run("post", "D", "--as", "orchestrator", "--title", "scope", "x")
+        run("post", "C", "--as", "backend", "--to", "frontend", "--title", "shape", "--files", "a.ts", "x")
+        out = run("close", "--sprint", "S1", "--as", "orchestrator")
+        self.assertIn("kept open (unanswered", out)
+        self.assertIn("kept open (contracts", out)
+        self.assertEqual(sorted(t["id"] for t in self.board().open_threads()), ["B-003", "C-005", "Q-001"])
+        run("close", "--sprint", "S1", "--as", "orchestrator", "--include-unanswered", "--include-contracts")
+        self.assertEqual(self.board().open_threads(), [])
+
+    def test_sprint_rejects_names_without_digits(self):
+        with self.assertRaises(SystemExit):
+            run("sprint", "new")
+        self.assertEqual(config.load(self.root)["sprint"], "S1")
+        self.assertFalse((self.root / ".baton/archive/BOARD-S1.md").exists())
+        run("sprint", "next", "--force")
+        self.assertEqual(config.load(self.root)["sprint"], "next")
+
+    def test_handoff_and_brief_point_out_own_threads_that_look_settled(self):
+        run("post", "B", "--as", "frontend", "--to", "backend", "--title", "500 error", "x")
+        run("reply", "B-001", "--as", "backend", "fixed")
+        run("post", "Q", "--as", "frontend", "--to", "backend", "--title", "no reply yet", "x")
+        self.assertIn("## Yours, replied to: close if settled", run("brief", "--as", "frontend"))
+        out = run("handoff", "--as", "frontend", "--phase", "S1", "--state", "DONE", "--to", "qa",
+                  "--title", "done", "short")
+        self.assertIn("B-001 (reply from backend)", out)
+        self.assertNotIn("Q-002", out.split("note:")[-1])
+        out = run("handoff", "--as", "frontend", "--phase", "S1", "--state", "DONE", "--to", "qa",
+                  "--title", "done again", "--closes", "B-001", "short")
+        self.assertNotIn("someone has replied", out)
 
     def test_shim_runs_without_install(self):
         shim = Path(__file__).resolve().parent.parent / "bin" / "baton"
@@ -243,7 +323,7 @@ class BoardTest(unittest.TestCase):
 
     def test_corrupt_line_is_reported(self):
         run("post", "Q", "--as", "qa", "--title", "ok", "x")
-        with (self.root / "coordination/bbs/S1.jsonl").open("a") as f:
+        with (self.root / ".baton/events/S1.jsonl").open("a") as f:
             f.write("{not json\n")
         with self.assertRaises(BoardError):
             self.board().events()

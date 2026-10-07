@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-labelledby="t">
+  <title id="t">baton: Hand-offs for AI agents that build software together</title>
+  <rect width="1280" height="640" fill="#0D1117"/>
+  <rect x="0" y="616" width="1280" height="24" fill="#F76707"/>
+  <g transform="translate(112 152) scale(0.9375)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="#1B2230"/>
+    <rect x="56" y="60" width="28" height="24" rx="8" fill="#8B949E"/>
+    <rect x="96" y="60" width="92" height="24" rx="12" fill="#D0D7DE"/>
+    <rect x="56" y="104" width="28" height="24" rx="8" fill="#8B949E"/>
+    <rect x="96" y="104" width="60" height="24" rx="12" fill="#D0D7DE"/>
+    <rect x="56" y="152" width="160" height="44" rx="22" fill="#F76707"/>
+    <rect x="176" y="152" width="7" height="44" fill="#1B2230" fill-opacity="0.35"/>
+    <rect x="190" y="152" width="7" height="44" fill="#1B2230" fill-opacity="0.35"/>
+  </g>
+  <text x="416" y="300" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="148" font-weight="700" letter-spacing="-4" fill="#E6EDF3">baton</text>
+  <text x="422" y="368" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="34" font-weight="500" fill="#9198A1">Hand-offs for AI agents that build</text>
+  <text x="422" y="412" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif" font-size="34" font-weight="500" fill="#9198A1">software together</text>
+  <text x="112" y="532" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace" font-size="26" fill="#9198A1">post · reply · handoff · unread  <tspan fill="#FF922B">→</tspan>  <tspan fill="#E6EDF3">&lt;sprint&gt;.jsonl</tspan>  <tspan fill="#FF922B">→</tspan>  <tspan fill="#E6EDF3">BOARD.md</tspan></text>
+</svg>
