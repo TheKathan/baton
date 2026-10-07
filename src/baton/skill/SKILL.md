@@ -74,7 +74,7 @@ EOF
   2. Close what's settled. `baton close --sprint S6 --as orchestrator --reason "…"` keeps unanswered questions and blockers, and live contracts, open. Don't add `--include-*` at a normal close; those flags are for importing old history.
   3. Run `baton sprint S7`.
   4. Tell the owner what carried over, especially unanswered questions and who owes them.
-- **Watch costs** with `baton stats`.
+- **Watch health and cost** with `baton metrics` (answer and close times, stale threads, who is waiting), `baton open --stale 2d` and `baton stats`. For humans: `baton serve` (a read-only dashboard).
 - **Migrate an old Markdown board** with `baton import` (see `baton import --help`).
 
 `baton <command> --help` lists every flag.

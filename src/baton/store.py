@@ -102,14 +102,16 @@ class Board:
             if e["type"] == "entry":
                 t = {k: v for k, v in e.items() if k != "type"}
                 t.setdefault("status", "OPEN")
-                t.update(replies=[], closed_by=None, closed_reason=None)
+                t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, last_ts=e["ts"])
                 threads[e["id"]] = t
             elif e["id"] in threads:
                 t = threads[e["id"]]
+                t["last_ts"] = e["ts"]
                 if e["type"] == "reply":
                     t["replies"].append(e)
                 elif e["type"] == "close":
-                    t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"))
+                    t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
+                             closed_ts=e["ts"])
         return threads
 
     def get(self, entry_id: str) -> dict:
