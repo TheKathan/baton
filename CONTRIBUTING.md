@@ -32,6 +32,15 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 - Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
+## What a pull request needs
+Repository rulesets enforce all of these on `main`:
+- an approving review from the code owner (`@TheKathan`, see `.github/CODEOWNERS`), given after your last push; new pushes dismiss earlier approvals;
+- all review threads resolved;
+- every `test` job green and up to date with `main`;
+- a merge commit or a squash merge (no rebase merges; history on `main` is never rewritten).
+
+Pull requests from forks run CI only after a maintainer approves the run.
+
 ## Commits and pull requests
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat(store): …`, `fix(render): …`, `docs: …`.
 - **Never add `Co-Authored-By` lines** (for people or AI tools) to commit messages.

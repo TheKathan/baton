@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Security
+- `CODEOWNERS`, and repository rulesets on `main` (code-owner approval, passing tests, no force-push or deletion) and on `v*` tags (release deploy key only).
+- The release workflow pushes through a deploy key held in a `release` environment that only `main` can use.
+- Workflow actions are pinned to commit SHAs and kept current by Dependabot. Only GitHub-owned and `TheKathan/*` actions are allowed.
+- SECURITY.md: private vulnerability reporting, and how the repository is protected.
+
 ## [0.2.1] - 2026-10-07
 
 ### Changed

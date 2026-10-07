@@ -1,0 +1,6 @@
+# Every change needs a review from the code owner (enforced by the "main" ruleset).
+* @TheKathan
+
+# Workflows, rulesets-adjacent config and the release tooling are security-sensitive.
+/.github/ @TheKathan
+/scripts/ @TheKathan
