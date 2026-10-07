@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-07
+
 **baton 1.0: the first stable release.** It brings together the 0.4–0.8 work: one board across git worktrees, a documented and versioned board format, the MCP server, `baton metrics` and the `baton serve` dashboard.
 
 ### Stability
