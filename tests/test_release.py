@@ -47,7 +47,7 @@ class ReleaseTest(unittest.TestCase):
                                   capture_output=True, text=True, check=True)
             info = json.loads(pack.stdout)[0]
             pkg = json.loads((ROOT / "package.json").read_text())
-            self.assertTrue(pkg.get("private"))  # not on the npm registry yet; installed from GitHub
+            self.assertNotIn("private", pkg)  # publishable to npm
             self.assertEqual(pkg["name"], "agent-baton")
             self.assertEqual(pkg["bin"], {"baton": "bin/baton"})
             files = {f["path"] for f in info["files"]}
