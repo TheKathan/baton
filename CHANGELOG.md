@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
 ### Added
 - **One board across git worktrees.** Inside a linked worktree, baton uses the main worktree's `.baton/`, so agents in separate worktrees share one id counter and one lock instead of each writing a diverging copy. `baton where` shows `shared_from_worktree`. Opt out with `"shared_worktrees": false`; `BATON_ROOT` still wins.
 
