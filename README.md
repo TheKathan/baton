@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://github.com/TheKathan/baton/actions/workflows/test.yml"><img alt="tests" src="https://github.com/TheKathan/baton/actions/workflows/test.yml/badge.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-%E2%89%A5%203.11-3776AB">
-  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green">
+  <img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue">
   <img alt="Dependencies: none (stdlib)" src="https://img.shields.io/badge/dependencies-none%20(stdlib)-brightgreen">
   <img alt="Platform: macOS | Linux" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey">
   <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-blue">
@@ -258,4 +258,4 @@ Why use it: in our evals, agents with the skill kept the board tidy. They closed
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [SECURITY.md](SECURITY.md)
-- [MIT License](LICENSE)
+- [GNU GPL v3.0 or later](LICENSE)
