@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Policies:** team rules in `.baton/config.json` under `"policies"`, checked on every new entry from the CLI and MCP. The rules are `cites`, `files`, `named_to`, `max_lines` and `title_match`, each limited to some `kinds` if you want, with mode `warn` or `refuse` and an optional `message`. A refused entry writes nothing. `baton lint` reports existing entries that break a rule, and a bad policy config is reported clearly.
+- **Exact UTC time on every event** (`at`, ISO 8601), next to the local `ts`. Metrics use it, so answer and close times are exact and correct across timezones. Optional in format 1, so older boards are unaffected.
+- **The importer keeps answers and closes:** `> [A] role · date: …` lines become reply events (with their date), and `status: CLOSED` markers or headers become close events. Imported boards now have real answered and closed state, and real metrics.
+- The MCP `baton_post` tool offers the entry kinds configured for the project.
+
 ## [1.0.1] - 2026-10-07
 
 ### Changed

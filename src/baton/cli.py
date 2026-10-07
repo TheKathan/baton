@@ -9,7 +9,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from . import __version__, config, render
+from . import __version__, config, policies, render
 from .importer import import_file
 from .store import Board, BoardError, normalise_id
 
@@ -118,7 +118,7 @@ def cmd_post(args) -> None:
                    _csv(args.files), _csv(args.cites), _csv(args.blocks))
     _after_write(board)
     print(f"posted {t['id']}")
-    for w in _long_body_warnings(board, t):
+    for w in _long_body_warnings(board, t) + board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
 
 
@@ -245,6 +245,8 @@ def cmd_handoff(args) -> None:
         thread = board.get(i)
         (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
     t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites))
+    for w in board.last_warnings:
+        print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
     for i in to_close:
         board.close(i, role, f"settled by {t['id']}")
@@ -304,7 +306,8 @@ def cmd_import(args) -> None:
     res = import_file(board, Path(args.file), args.sprint, dry_run=args.dry_run)
     verb = "would import" if args.dry_run else "imported"
     noun = "entry" if res["entries"] == 1 else "entries"
-    print(f"{verb} {res['entries']} {noun} from {res['file']} as sprint {res['sprint']}")
+    print(f"{verb} {res['entries']} {noun} from {res['file']} as sprint {res['sprint']}"
+          f" ({res['replies']} answers as replies, {res['closes']} closed)")
     for r in res["renamed"]:
         print(f"  duplicate id renamed: {r}")
     if not args.dry_run:
@@ -338,6 +341,8 @@ def cmd_lint(args) -> None:
             if t["kind"] == "H" and len(t["body"].splitlines()) > board.cfg["handoff_max_lines"]:
                 warnings.append(f"{t['id']}: hand-off longer than {board.cfg['handoff_max_lines']} lines")
             warnings.extend(_long_body_warnings(board, t))
+            refused, warned = policies.check(board.cfg.get("policies"), t)
+            warnings.extend(f"{t['id']}: {m}" for m in refused + warned)
     for w in warnings:
         print(f"warn  {w}")
     for e in errors:

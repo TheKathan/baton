@@ -41,6 +41,7 @@ A JSON object. Missing keys take these defaults:
 | `id_width` | integer | `3` |
 | `auto_render` | boolean | `true` |
 | `shared_worktrees` | boolean | `true` |
+| `policies` | array of rule objects (see the README) | `[]` |
 
 ## Events
 
@@ -55,6 +56,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | `from` | string | The role that wrote it |
 | `sprint` | string | Sprint name; equals the file it is stored in |
 | `ts` | string | Local time `YYYY-MM-DD HH:MM`. Imported entries may carry only `YYYY-MM-DD`, or `unknown` |
+| `at` | string | Optional (baton ≥ 1.1): the exact time in UTC, ISO 8601 (`2026-10-07T18:55:03Z`). Metrics prefer it to `ts`. Imported events have none |
 
 `entry` adds:
 
@@ -68,7 +70,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |
 
-`reply` adds `body` (string). `close` adds `reason` (string, may be empty).
+`reply` adds `body` (string). `close` adds `reason` (string, may be empty). Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
 
 Ids look like `<kind>-<n zero-padded to id_width>`, for example `Q-007`. An imported duplicate gets the suffix `~2`, `~3` and so on.
 
