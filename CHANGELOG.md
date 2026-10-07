@@ -4,6 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **`baton metrics`**: board health from the event log. It reports the time to first answer and the time to close (median and p90), opened vs closed and close rate, unanswered Q/B, stale threads, and per-role load (posted, replies, answered, median answer time, waiting on them, open owned). Use `--sprint`, `--stale` and `--json`.
+- **`baton serve`**: a read-only local dashboard, standard library only, bound to localhost by default. It shows blockers, questions waiting by role, open threads by idle time, collapsible live contracts, status, and sprint and role metrics, with `/e/<id>`, `/api/board.json` and `/api/metrics.json`. All board text is HTML-escaped, a strict Content-Security-Policy applies, and anything but GET is refused.
+- **`baton open --stale AGE`** (`2d`, `36h`, `90m`): only threads idle at least that long.
+
 ## [0.6.0] - 2026-10-07
 
 ### Added

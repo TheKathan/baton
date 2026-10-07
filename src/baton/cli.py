@@ -206,6 +206,16 @@ def cmd_open(args) -> None:
     kinds = [k.upper() for k in _csv(args.kind)] or None
     role = _role(args) or None
     rows = board.open_threads(role, kinds, args.blocking, named_only=bool(role) and not args.all)
+    if args.stale:
+        from datetime import datetime
+
+        from .metrics import age_hours, parse_duration
+        try:
+            limit = parse_duration(args.stale)
+        except ValueError as e:
+            raise BoardError(str(e)) from None
+        now = datetime.now()  # noqa: DTZ005 - board times are local wall-clock
+        rows = [t for t in rows if (age_hours(t, now) or 0) >= limit]
     for t in rows:
         print(render.one_line(t) + (f" · blocks {', '.join(t['blocks'])}" if t.get("blocks") else ""))
     hidden = ""
@@ -477,6 +487,24 @@ def cmd_mcp(args) -> None:
         print(f"{path} already registers the baton MCP server")
 
 
+def cmd_metrics(args) -> None:
+    """Board health: answer and close times, stale threads, per-role load."""
+    from . import metrics
+    board = _board(args)
+    try:
+        stale = metrics.parse_duration(args.stale)
+    except ValueError as e:
+        raise BoardError(str(e)) from None
+    m = metrics.compute(board, sprint=args.sprint, stale_hours=stale)
+    print(json.dumps(m, indent=2) if args.json else metrics.format_text(m))
+
+
+def cmd_serve(args) -> None:
+    """A read-only local dashboard of the board."""
+    from . import serve
+    serve.run(_board(args), host=args.host, port=args.port, open_browser=args.open)
+
+
 def cmd_where(args) -> None:
     root, worktree = config.locate()
     board = Board(root, config.load(root))
@@ -553,6 +581,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--kind")
     sp.add_argument("--all", action="store_true", help="also threads addressed to all")
     sp.add_argument("--blocking", action="store_true", help="only blockers and entries with --blocks")
+    sp.add_argument("--stale", metavar="AGE", help="only threads idle at least AGE, e.g. 2d, 36h, 90m")
 
     sp = add("handoff", cmd_handoff, "post a hand-off (H) and update your status row", role=True)
     sp.add_argument("--phase", required=True)
@@ -601,6 +630,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("migrate", cmd_migrate, "check the board's on-disk format and record the current one")
     sp.add_argument("--check", action="store_true", help="only report; change nothing")
+
+    sp = add("metrics", cmd_metrics, "board health: answer/close times, stale threads, per-role load")
+    sp.add_argument("--sprint", help="only this sprint (default: all)")
+    sp.add_argument("--stale", default="48h", help="idle time that counts as stale (default 48h)")
+    sp.add_argument("--json", action="store_true", help="machine-readable output")
+
+    sp = add("serve", cmd_serve, "read-only local web dashboard of the board")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=8765)
+    sp.add_argument("--open", action="store_true", help="open it in the browser")
 
     sp = add("mcp", cmd_mcp, "run the MCP server on stdio, or `mcp install` to register it in .mcp.json")
     sp.add_argument("action", choices=["serve", "install"], nargs="?", default="serve")

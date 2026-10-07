@@ -112,6 +112,7 @@ baton --version
 | `status` | Show the status table, or set your row |
 | `sprint <name>` | Archive the current sprint and start a new one |
 | `render`, `lint`, `stats` | Regenerate the views, check the board, estimate token cost |
+| `metrics`, `serve` | Board health numbers; a read-only local dashboard |
 | `import <file>` | Import a Markdown board as one sprint (`--dry-run`) |
 | `skill [install\|show\|path]` | Install or print the agent skill |
 | `mcp [install]` | Run the MCP server on stdio, or register it in `.mcp.json` |
@@ -131,6 +132,16 @@ baton open --blocking                      # blockers first
 baton close --sprint S1 --as orchestrator  # close settled threads; unanswered Q/B and live contracts stay open
 baton sprint S2                            # archive S1, start S2; open threads carry over
 ```
+
+## Dashboard and metrics
+
+```bash
+baton serve --open           # read-only local dashboard on http://127.0.0.1:8765
+baton metrics                # board health; --sprint S7, --json, --stale 36h
+baton open --stale 2d        # open threads nobody has touched for two days
+```
+
+The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts, the status table and per-sprint and per-role metrics. It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. `baton metrics` reports the time to first answer and the time to close (median and p90), opened vs closed, unanswered questions and blockers, stale threads, and each role's load. The same numbers are at `/api/metrics.json`.
 
 ## Use it from MCP clients
 
