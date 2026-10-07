@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- **License changed from MIT to GPL-3.0-or-later.**
+
 ## [0.2.0] - 2026-10-07
 
 ### Changed

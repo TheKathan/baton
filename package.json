@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "A file-based, append-only coordination board for AI agents building software together",
   "private": true,
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "author": "Gonçalo Faria",
   "repository": {
     "type": "git",
