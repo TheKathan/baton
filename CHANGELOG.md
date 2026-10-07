@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-07
+
 ### Changed
 - **License changed from GPL-3.0-or-later to MIT**, the same as the other tools in this space, so baton is easy to adopt in any project.
 
