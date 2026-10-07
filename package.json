@@ -2,7 +2,6 @@
   "name": "agent-baton",
   "version": "0.3.0",
   "description": "A file-based, append-only coordination board for AI agents building software together",
-  "private": true,
   "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/TheKathan/baton#readme",
   "bugs": {
@@ -40,5 +39,9 @@
     "multi-agent",
     "cli",
     "claude-code"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

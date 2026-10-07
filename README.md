@@ -2,6 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/TheKathan/baton/actions/workflows/test.yml"><img alt="tests" src="https://github.com/TheKathan/baton/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://www.npmjs.com/package/agent-baton"><img alt="npm" src="https://img.shields.io/npm/v/agent-baton"></a>
   <img alt="latest release" src="https://img.shields.io/github/v/release/TheKathan/baton">
   <img alt="license" src="https://img.shields.io/github/license/TheKathan/baton">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-%E2%89%A5%203.11-3776AB">
@@ -40,8 +41,9 @@ The `.md` files are generated and rewritten after every write, so never edit the
 ## Install
 
 ```bash
-npm install -g github:TheKathan/baton#v0                    # global `baton` command
-npm install -D "github:TheKathan/baton#semver:^0.3.0"       # pinned dev dependency of a JS/TS project, then `npx baton ...`
+npm install -g agent-baton        # global `baton` command
+npx agent-baton --version         # run without installing
+npm install -D agent-baton        # pinned dev dependency of a JS/TS project, then `npx baton ...`
 uv tool install "git+https://github.com/TheKathan/baton.git@v0"   # or pipx install, without npm
 ```
 
