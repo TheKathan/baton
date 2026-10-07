@@ -72,6 +72,8 @@ class MetricsTest(Base):
         self.assertEqual(m["roles"]["backend"]["answered"], 1)
         self.assertEqual(m["roles"]["backend"]["asked_of"], 2)
         self.assertEqual(m["roles"]["frontend"]["waiting_on"], 1)
+        self.assertGreater(m["sprints"]["S1"]["tokens"], 0)
+        self.assertEqual(m["roles"]["backend"]["unread"], 3)
 
     def test_cli_metrics_and_open_stale(self):
         text = run("metrics")
@@ -111,12 +113,15 @@ class ServeTest(Base):
     def test_dashboard(self):
         code, body, headers = self.get("/")
         self.assertEqual(code, 200)
-        for text in ("Blockers", "B-003", "Questions waiting for an answer", "Q-002", "Sprints", "Roles"):
+        for text in ("Blockers", "B-003", "Questions waiting for an answer", "Q-002", "Metrics"):
             self.assertIn(text, body)
         self.assertNotIn("<script>alert(1)</script>", body)  # board text is escaped
         self.assertIn("&lt;script&gt;", body)
         self.assertIn("default-src 'none'", headers["Content-Security-Policy"])
         self.assertIn("Live contracts (0)", body)
+        for text in ("Time to first answer (median)", "2.0h", "Time to close (median)", "4.0h",
+                     "Questions answered", "Metrics by sprint", "Metrics by role", "Unread (~tokens)"):
+            self.assertIn(text, body)
 
     def test_entry_api_and_errors(self):
         code, body, _ = self.get("/e/Q-1")

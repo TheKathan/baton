@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from statistics import median
 
+from . import render
 from .store import Board
 
 STALE_DEFAULT_HOURS = 48.0
@@ -79,6 +80,10 @@ def _summary(threads: list[dict], now: datetime, stale_h: float) -> dict:
     }
 
 
+def _tokens(text: str) -> int:
+    return (len(text) + 3) // 4  # same estimate as `baton stats` (~4 characters per token)
+
+
 def compute(board: Board, sprint: str | None = None, now: datetime | None = None,
             stale_hours: float = STALE_DEFAULT_HOURS) -> dict:
     now = now or datetime.now()  # noqa: DTZ005 - compared with local wall-clock board times
@@ -89,8 +94,10 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
         sprints.setdefault(t["sprint"], []).append(t)
     order = sorted(sprints, key=lambda s: min(t["ev"] for t in sprints[s]))
     roles = board.cfg.get("roles") or sorted({t["from"] for t in every} | set(board.status()))
+    from .cli import _unread_text  # lazy: cli imports this module
     per_role = {}
     for r in roles:
+        unread_text, unread_count = _unread_text(board, r, False, peek=True)
         mine = [t for t in scope if t["from"] == r]
         asked = [t for t in scope if t["kind"] in ("Q", "B") and r in t["to"] and t["from"] != r]
         answers = [next((x for x in t["replies"] if x["from"] == r), None) for t in asked]
@@ -102,6 +109,8 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
             "hours_to_answer": _stats([hours_between(t["ts"], a["ts"]) for t, a in zip(asked, answers) if a]),
             "waiting_on": len(board.awaiting(r)),
             "open_owned": sum(1 for t in mine if t["status"] == "OPEN"),
+            "unread": unread_count,
+            "unread_tokens": _tokens(unread_text),
         }
     return {
         "generated": now.strftime("%Y-%m-%d %H:%M"),
@@ -109,8 +118,9 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
         "scope": sprint or "all sprints",
         "stale_hours": stale_hours,
         "summary": _summary(scope, now, stale_hours),
-        "sprints": {s: _summary(sprints[s], now, stale_hours) for s in order
-                    if sprint is None or s == sprint},
+        "sprints": {s: {**_summary(sprints[s], now, stale_hours),
+                        "tokens": _tokens("".join(render.entry_md(t) for t in sprints[s]))}
+                    for s in order if sprint is None or s == sprint},
         "roles": per_role,
     }
 
@@ -133,15 +143,17 @@ def format_text(m: dict) -> str:
         f"Stale          {s['stale_open']} open thread(s) idle >= {m['stale_hours']:g}h"
         + (f": {', '.join(s['stale_ids'][:10])}" + (" …" if len(s["stale_ids"]) > 10 else "") if s["stale_ids"] else ""),
         "",
-        "Sprint       threads  open  closed  answered  median 1st answer  median close  stale",
+        "Sprint       threads  open  closed  answered  median 1st answer  median close  stale  ~tokens",
     ]
     for name, x in m["sprints"].items():
         lines.append(f"{name:12} {x['entries']:7} {x['open']:5} {x['closed']:7} {x['answered']:9}  "
-                     f"{_short(x['hours_to_first_answer']):>17}  {_short(x['hours_to_close']):>12}  {x['stale_open']:5}")
-    lines += ["", "Role           posted  replies  asked  answered  median answer  waiting on  open owned"]
+                     f"{_short(x['hours_to_first_answer']):>17}  {_short(x['hours_to_close']):>12}  {x['stale_open']:5}"
+                     f"  {x['tokens']:7}")
+    lines += ["", "Role           posted  replies  asked  answered  median answer  waiting on  open owned  unread (~tokens)"]
     for r, x in m["roles"].items():
         lines.append(f"{r:14} {x['posted']:6} {x['replies']:8} {x['asked_of']:6} {x['answered']:9}  "
-                     f"{_short(x['hours_to_answer']):>13}  {x['waiting_on']:10}  {x['open_owned']:10}")
+                     f"{_short(x['hours_to_answer']):>13}  {x['waiting_on']:10}  {x['open_owned']:10}"
+                     f"  {x['unread']} (~{x['unread_tokens']})")
     return "\n".join(lines)
 
 

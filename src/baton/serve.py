@@ -33,6 +33,7 @@ h1{font-size:20px;margin:0}h1 b{color:var(--accent)}h2{font-size:15px;margin:24p
 .muted{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
 .card .n{font-size:24px;font-weight:700}.card .l{color:var(--muted);font-size:12px}
+.card .s{color:var(--muted);font-size:12px;margin-top:2px}
 .bad .n{color:var(--bad)}.warn .n{color:var(--warn)}.ok .n{color:var(--ok)}
 .wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);
@@ -106,11 +107,30 @@ def dashboard(board: Board) -> str:
                          for lbl, v, c in cards)
     th = ["Id", "Kind", "From", "To", "Title", "Idle", "Sprint"]
     status = board.status()
+    def stat(x):
+        return (f'{x["median"]}h', f'p90 {x["p90"]}h · n={x["n"]}') if x["n"] else ("—", "no data yet")
+    fa, cl = stat(s["hours_to_first_answer"]), stat(s["hours_to_close"])
+    health = [
+        ("Time to first answer (median)", fa[0], fa[1], ""),
+        ("Time to close (median)", cl[0], cl[1], ""),
+        ("Opened / closed", f'{s["entries"]} / {s["closed"]}',
+         ", ".join(f"{k} {v}" for k, v in s["by_kind"].items()), ""),
+        ("Questions answered", f'{s["answered"]} / {s["questions_and_blockers"]}',
+         f'{s["unanswered_open"]} open with no answer', "warn" if s["unanswered_open"] else ""),
+        (f'Stale (idle ≥ {m["stale_hours"]:g}h)', s["stale_open"],
+         ", ".join(s["stale_ids"][:6]) + (" …" if len(s["stale_ids"]) > 6 else "") or "none",
+         "warn" if s["stale_open"] else "ok"),
+        ("Unread now (all roles)", sum(x["unread"] for x in m["roles"].values()),
+         f'~{sum(x["unread_tokens"] for x in m["roles"].values())} tokens to read', ""),
+    ]
+    health_html = "".join(f'<div class="card {c}"><div class="n">{esc(v)}</div><div class="l">{esc(lbl)}</div>'
+                          f'<div class="s">{esc(sub)}</div></div>' for lbl, v, sub, c in health)
     sprint_rows = [[esc(name), esc(x["entries"]), esc(x["open"]), esc(x["closed"]), esc(x["answered"]),
                     esc(metrics._short(x["hours_to_first_answer"])), esc(metrics._short(x["hours_to_close"])),
-                    esc(x["stale_open"])] for name, x in m["sprints"].items()]
+                    esc(x["stale_open"]), esc(f'~{x["tokens"]}')] for name, x in m["sprints"].items()]
     role_rows = [[esc(r), esc(x["posted"]), esc(x["replies"]), esc(f'{x["answered"]}/{x["asked_of"]}'),
-                  esc(metrics._short(x["hours_to_answer"])), esc(x["waiting_on"]), esc(x["open_owned"])]
+                  esc(metrics._short(x["hours_to_answer"])), esc(x["waiting_on"]), esc(x["open_owned"]),
+                  esc(f'{x["unread"]} (~{x["unread_tokens"]})')]
                  for r, x in m["roles"].items()]
     body = f"""
 <header><h1><b>baton</b> · {esc(board.root.name)}</h1>
@@ -126,10 +146,11 @@ def dashboard(board: Board) -> str:
     [[esc(r), f'<span class="nw">{esc(x["phase"])}</span>', esc(x["state"]),
       f'<span class="nw">{esc(x["handoff"] or "—")}</span>', f'<span class="nw">{esc(x["updated"])}</span>']
      for r, x in sorted(status.items())], "No status rows yet.")}
-<h2>Sprints</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer", "Median close",
-                         "Stale"], sprint_rows, "No sprints yet.")}
-<h2>Roles</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on", "Open owned"],
-                       role_rows, "No roles yet.")}
+<h2>Metrics</h2><div class="cards">{health_html}</div>
+<h2>Metrics by sprint</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer",
+                                   "Median close", "Stale", "~Tokens"], sprint_rows, "No sprints yet.")}
+<h2>Metrics by role</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on",
+                                 "Open owned", "Unread (~tokens)"], role_rows, "No roles yet.")}
 """
     return page(f"baton · {board.root.name}", body)
 
