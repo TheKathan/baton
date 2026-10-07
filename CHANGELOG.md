@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Board format v1, documented and versioned** ([docs/FORMAT.md](docs/FORMAT.md)). Every new event carries `"v": 1`, and the config records `"format": 1`. Events from baton 0.x (without `v`) are read as format 1 and never rewritten. Boards with events or a config from a newer format are refused with an upgrade message, never half-read. `baton migrate --check` reports the formats on disk, and `baton migrate` records the current format in the config.
+
 ## [0.4.0] - 2026-10-07
 
 ### Added

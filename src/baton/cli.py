@@ -431,6 +431,35 @@ def cmd_skill(args) -> None:
     print(f"installed the baton skill to {target}")
 
 
+def cmd_migrate(args) -> None:
+    """Report the board's on-disk format; record the current format in the config."""
+    from .schema import SCHEMA_VERSION
+    root = config.find_root()
+    raw = json.loads((root / config.CONFIG_NAME).read_text())
+    versions: Counter = Counter()
+    untagged = 0
+    for f in sorted((root / config.load(root)["dir"]).glob("*.jsonl")):
+        for line in f.read_text().splitlines():
+            if line.strip():
+                event = json.loads(line)
+                versions[int(event.get("v", 1))] += 1
+                untagged += "v" not in event
+    print(f"baton reads format {SCHEMA_VERSION}; config says format {raw.get('format', '1 (unset)')}")
+    print("events by format: " + (", ".join(f"v{v}: {n}" for v, n in sorted(versions.items())) or "none"))
+    if untagged:
+        print(f"{untagged} event(s) predate format tags (baton 0.x): read as format 1, unchanged on disk")
+    if max(versions, default=SCHEMA_VERSION) > SCHEMA_VERSION:
+        raise BoardError(f"this board has events newer than format {SCHEMA_VERSION}; upgrade baton")
+    if args.check:
+        return
+    if raw.get("format") == SCHEMA_VERSION:
+        print("nothing to migrate")
+        return
+    raw["format"] = SCHEMA_VERSION
+    (root / config.CONFIG_NAME).write_text(json.dumps(raw, indent=2) + "\n")
+    print(f"recorded format {SCHEMA_VERSION} in {config.CONFIG_NAME}; event files are never rewritten")
+
+
 def cmd_where(args) -> None:
     root, worktree = config.locate()
     board = Board(root, config.load(root))
@@ -552,6 +581,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="install into this project's .claude/skills/ instead of ~/.claude/skills/")
     sp.add_argument("--dir", help="install into <dir>/baton/SKILL.md")
     sp.add_argument("--force", action="store_true", help="replace a different existing copy")
+
+    sp = add("migrate", cmd_migrate, "check the board's on-disk format and record the current one")
+    sp.add_argument("--check", action="store_true", help="only report; change nothing")
 
     add("where", cmd_where, "print the project root and config")
     add("guide", lambda a: print(GUIDE), "print the agent quick guide")

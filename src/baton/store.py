@@ -8,7 +8,8 @@ Event types:
   entry  {id, kind, n, from, to[], title, body, files[], cites[], blocks[]}
   reply  {id, from, body}
   close  {id, from, reason}
-Every event also carries {type, ev, sprint, ts}.
+Every event also carries {v, type, ev, sprint, ts}. The format is documented in
+docs/FORMAT.md; see schema.py for versioning.
 """
 
 from __future__ import annotations
@@ -19,10 +20,16 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
+
 ALL = "all"
 
 
 class BoardError(Exception):
+    pass
+
+
+class BoardFormatError(BoardError, FormatError):
     pass
 
 
@@ -36,6 +43,10 @@ class Board:
         self.cfg = cfg
         self.dir = root / cfg["dir"]
         self.cursors = self.dir / ".cursors"
+        try:
+            check_config(cfg, str(root / ".baton/config.json"))
+        except FormatError as e:
+            raise BoardFormatError(str(e)) from None
 
     # ---------- low level ----------
     @contextmanager
@@ -60,15 +71,20 @@ class Board:
                 for i, line in enumerate(f, 1):
                     if line.strip():
                         try:
-                            out.append(json.loads(line))
+                            raw = json.loads(line)
                         except json.JSONDecodeError as e:
                             raise BoardError(f"{p.name}:{i}: corrupt line ({e})") from e
+                        try:
+                            out.append(upgrade(raw, f"{p.name}:{i}"))
+                        except FormatError as e:
+                            raise BoardFormatError(str(e)) from None
         out.sort(key=lambda e: e["ev"])
         return out
 
     def _append(self, event: dict) -> dict:
         """Caller must hold the lock. Assigns ev, sprint and ts."""
         evs = self.events()
+        event = {"v": SCHEMA_VERSION, **{k: v for k, v in event.items() if k != "v"}}
         event["ev"] = (evs[-1]["ev"] if evs else 0) + 1
         event.setdefault("sprint", self.cfg["sprint"])
         event.setdefault("ts", now())

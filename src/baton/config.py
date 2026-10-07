@@ -11,6 +11,7 @@ BATON_DIR = ".baton"
 CONFIG_NAME = f"{BATON_DIR}/config.json"
 
 DEFAULTS: dict = {
+    "format": 1,  # board format version (docs/FORMAT.md); set by `baton init`
     "dir": ".baton/events",
     "sprint": "S1",
     "board_md": ".baton/BOARD.md",
