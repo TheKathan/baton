@@ -2,6 +2,7 @@
 
 ## Ground rules
 - **Standard library only.** baton must keep running anywhere Python ≥ 3.11 runs, with no installs.
+- **The board format is a public contract** ([docs/FORMAT.md](docs/FORMAT.md)). Within format 1, only add optional fields. A breaking change needs format 2, an `UPGRADES[1]` read-time upgrade in `src/baton/schema.py`, and a major release.
 - **The JSONL files are the source of truth.** Every change to state is a new appended event. Never rewrite or delete lines. The Markdown views are generated output.
 - **Readers must not lose information.** Changes that save tokens may scope *which* entries are listed. They must not cut the text of the entries an agent asked for.
 - **Keep the CLI stable.** Agents' briefs and project protocols quote commands and flags. To rename something, keep the old spelling working as an alias for at least one minor version.

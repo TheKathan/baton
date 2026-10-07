@@ -35,7 +35,7 @@ Agents run the `baton` command. It appends one event per line to a JSONL file un
 .baton/BOARD.md, STATUS.md, CONTRACTS-INDEX.md, archive/    generated views
 ```
 
-The `.md` files are generated and rewritten after every write, so never edit them by hand.
+The `.md` files are generated and rewritten after every write, so never edit them by hand. The event format is stable and documented in [docs/FORMAT.md](docs/FORMAT.md): every 1.x release reads every older board.
 
 Agents working in **git worktrees** share one board: inside a linked worktree, baton uses the main worktree's `.baton/`, so every agent gets ids from the same counter under the same lock. Commit the board from the main worktree.
 
@@ -115,6 +115,7 @@ baton --version
 | `import <file>` | Import a Markdown board as one sprint (`--dry-run`) |
 | `skill [install\|show\|path]` | Install or print the agent skill |
 | `where` | Print the project root and config as JSON |
+| `migrate` | Check the board's on-disk format (`--check`) and record the current one |
 
 Comma-separated flags (`--to`, `--files`, `--cites`, `--ids`) take values like `qa,backend`. Agents read the board at three moments only, and never poll:
 
