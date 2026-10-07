@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from legacy import make_legacy
+
 from baton import config
 from baton.cli import main
 from baton.schema import SCHEMA_VERSION
@@ -25,6 +27,7 @@ class FormatTest(unittest.TestCase):
         self.root = Path(self.tmp.name)
         os.environ["BATON_ROOT"] = str(self.root)
         run("init", "--root", str(self.root), "--roles", "a,b")
+        make_legacy(self.root)
         self.log = self.root / ".baton/events/S1.jsonl"
 
     def tearDown(self):
@@ -38,7 +41,7 @@ class FormatTest(unittest.TestCase):
         run("post", "Q", "--as", "a", "--title", "t", "x")
         run("reply", "Q-001", "--as", "b", "y")
         lines = [json.loads(ln) for ln in self.log.read_text().splitlines()]
-        self.assertEqual([e["v"] for e in lines], [SCHEMA_VERSION] * 2)
+        self.assertEqual([e["v"] for e in lines], [1, 1])  # a legacy board keeps writing format 1
         self.assertTrue(self.log.read_text().startswith('{"v": 1,'))
         self.assertEqual(json.loads((self.root / ".baton/config.json").read_text())["format"], 1)
 

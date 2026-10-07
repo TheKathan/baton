@@ -4,6 +4,20 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Team mode, the default for new boards** (board format 2). Several people can commit one board:
+  - each clone appends only to its own log, `.baton/events/<sprint>/<clone-id>.jsonl`, so `git pull` merges the board without conflicts;
+  - entry ids are short random hex (`Q-7F3A`), so collisions across clones are very unlikely, and `baton lint` reports one;
+  - events carry `origin`, `seq`, `uid` and the UTC write time `rec`, and readers interleave every clone's log by time;
+  - status rows are events, so they don't conflict either;
+  - the generated views and per-machine files are git-ignored;
+  - the same role on another clone counts as a teammate, so its entries show up in `unread`;
+  - `baton lint` reports an id posted from two clones.
+- **`baton migrate --team`** switches a legacy board to the team layout. History, ids, status rows and read cursors are kept, and it prints the `git rm --cached` command for the views that are now ignored.
+
+### Changed
+- `baton init` creates team-layout boards. Boards created before 1.2 keep working unchanged in the single-machine layout (format 1, `Q-001` ids, committed views). A baton older than 1.2 refuses a format-2 board with an "upgrade baton" message instead of misreading it.
+
 ## [1.1.0] - 2026-10-07
 
 ### Added

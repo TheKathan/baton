@@ -1,4 +1,4 @@
-# Board format (version 1)
+# Board format (versions 1 and 2)
 
 This is the stable, on-disk format of a baton board. Boards are committed to git and read for years, so baton 1.x promises:
 
@@ -7,14 +7,16 @@ This is the stable, on-disk format of a baton board. Boards are committed to git
 - **Within format 1, fields are only added, and only as optional fields.** Readers must ignore fields they don't know.
 - **A board with events from a newer format is refused**, with a message to upgrade baton. It is never read halfway.
 
-A breaking change would create format 2, together with a read-time upgrade from 1 to 2 and a new major version of baton. `baton migrate --check` reports which formats a board contains.
+**Format 2 (the team layout, baton ≥ 1.2, the default for new boards)** lets several clones commit one board without conflicts. Format-1 boards (single-machine layout) keep working unchanged; `baton migrate --team` switches one to format 2. Format-1 events are upgraded to format 2 in memory as they are read. A baton older than 1.2 refuses a format-2 board. `baton migrate --check` reports which formats a board contains.
 
 ## Files
 
 ```text
 .baton/config.json               project config (JSON object, see below)
-.baton/events/<sprint>.jsonl     the event log, one file per sprint; one JSON object per line, UTF-8
-.baton/events/status.json        one status row per role
+.baton/events/<sprint>/<origin>.jsonl   format 2: one append-only log per clone (origin) per sprint
+.baton/events/<sprint>.jsonl     format 1: one shared log per sprint (and legacy history after migrate)
+.baton/events/status.json        format 1 only: one status row per role (format 2 stores status as events)
+.baton/events/.clone-id          format 2: this clone's origin id, 6 hex; git-ignored
 .baton/events/.lock              lock file (flock); git-ignored
 .baton/events/.cursors/<role>.json   per-role read cursor; git-ignored
 .baton/*.md, .baton/archive/*.md generated views; never parsed back
@@ -51,7 +53,11 @@ Every line of a sprint file is one event. All events carry these fields:
 |---|---|---|
 | `v` | integer | Format version. Absent on events written by baton 0.x, which are read as `1` |
 | `type` | `"entry"`, `"reply"` or `"close"` | Event type |
-| `ev` | integer | Global event number: unique and increasing across all sprint files. It defines the order |
+| `ev` | integer | Format 1: global event number, unique and increasing; it defines the order. Format 2: not stored (readers number events locally) |
+| `origin` | string | Format 2: the writing clone's id (`legacy` for upgraded format-1 events) |
+| `seq` | integer | Format 2: 1, 2, 3… per origin; never reused |
+| `uid` | string | Format 2: `<origin>.<seq>`, globally unique |
+| `rec` | string | Format 2: UTC time the event was written (ISO 8601); orders events across clones |
 | `id` | string | The thread the event belongs to (for an entry, its own id) |
 | `from` | string | The role that wrote it |
 | `sprint` | string | Sprint name; equals the file it is stored in |
@@ -63,25 +69,25 @@ Every line of a sprint file is one event. All events carry these fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `kind` | string | One of the config `kinds` (imported entries may carry other letters) |
-| `n` | integer | The id number. One counter covers all kinds; it is never reused |
+| `n` | integer | Format 1 (and imported entries): the id number from one counter for all kinds. Format 2 ids are `<kind>-<4+ uppercase hex>`, random, and have no `n` |
 | `to` | array of strings | Addressed roles, or `["all"]` |
 | `title`, `body` | string | Text. `title` may be empty on imported entries |
 | `files`, `cites`, `blocks` | arrays of strings | Affected files (required for `C`), cited ids, and what the entry blocks |
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |
 
-`reply` adds `body` (string). `close` adds `reason` (string, may be empty). Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
+`status` (format 2) adds `role`, `phase`, `state` and `handoff` (strings); the latest status event per role is that role's row. `reply` adds `body` (string). `close` adds `reason` (string, may be empty). Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
 
 Ids look like `<kind>-<n zero-padded to id_width>`, for example `Q-007`. An imported duplicate gets the suffix `~2`, `~3` and so on.
 
 ## Folding events into threads
 
-Read every sprint file and sort the events by `ev`. Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. Events whose `id` has no entry are ignored.
+Read every sprint file. Format 1: sort by `ev`. Format 2: upgraded format-1 (`legacy`) events first in `ev` order, then the rest by (`rec`, `origin`, `seq`). Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. Events whose `id` has no entry are ignored.
 
 ## status.json and cursors
 
-`status.json` maps each role to `{"phase", "state", "handoff", "updated"}`, all strings. A cursor file is `{"ev": <last event number the role has seen>}`.
+Format 1: `status.json` maps each role to `{"phase", "state", "handoff", "updated"}`, all strings. A cursor file is `{"seen": {<origin>: <last seq seen>}, "ev": <the legacy part, for older readers>}`; an older `{"ev": n}` cursor means `{"seen": {"legacy": n}}`.
 
 ## Concurrency
 
-Every write takes an exclusive `flock` on `.lock`, reads the files, computes the next `ev` and `n`, appends one line and releases the lock. The lock is advisory: tools that write the files directly bypass it.
+Every write takes an exclusive `flock` on `.lock` (one per clone), computes the next `seq` (format 2) or `ev` and `n` (format 1), appends one line and releases the lock. Across clones there is no lock: each clone writes only its own files, and git merges them. The lock is advisory: tools that write the files directly bypass it.

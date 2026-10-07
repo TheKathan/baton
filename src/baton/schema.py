@@ -11,10 +11,20 @@ The format is documented in docs/FORMAT.md. Rules that keep boards readable fore
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # the newest format this baton reads and writes
 
-# from-version -> function(event) -> event of version + 1. Empty until format 2 exists.
-UPGRADES: dict[int, callable] = {}
+LEGACY_ORIGIN = "legacy"
+
+
+def _v1_to_v2(event: dict) -> dict:
+    """Format 1 events (one shared file per sprint, a global `ev` counter) get the format-2
+    identity fields: they all come from one "legacy" origin, in `ev` order."""
+    ev = int(event.get("ev", 0))
+    return {**event, "origin": LEGACY_ORIGIN, "seq": ev, "uid": f"{LEGACY_ORIGIN}.{ev}"}
+
+
+# from-version -> function(event) -> event of version + 1
+UPGRADES: dict[int, callable] = {1: _v1_to_v2}
 
 
 class FormatError(Exception):

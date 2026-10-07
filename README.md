@@ -8,36 +8,50 @@
   <img alt="dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen">
 </p>
 
-**baton is a file-based, append-only coordination board for AI agents that build software together: an orchestrator, builder agents, QA and a human owner.** It lives in your project's `.baton/` folder and you use it through the `baton` command.
+**Agents that hand work to each other, and a board that refuses the sloppy hand-offs.** baton is a file-based, append-only coordination board for AI agents that build software together: an orchestrator, builder agents, QA and a human owner. It lives in your project's `.baton/` folder, in git, and you use it through the `baton` command. No server, no database, no dependencies.
+
+**Works with** Claude Code, Codex, Cursor or any MCP client, and with any agent that can run a shell command.
+
+```console
+$ echo "Which route serves the company health page?" | baton post Q --as frontend --to backend --title "Which route serves health?" -
+posted Q-B03E
+$ echo "Health endpoint done." | baton handoff --as backend --phase S1-A --state "DONE pending QA" --to qa --title "S1-A backend" -
+baton: hand-off refused:
+  - unanswered threads addressed to you: Q-B03E
+  (use --force with a reason in the body)
+$ baton reply Q-B03E --as backend --close "Use GET /api/health."
+replied to Q-B03E and closed it
+$ echo "Health endpoint done." | baton handoff --as backend --phase S1-A --state "DONE pending QA" --to qa --title "S1-A backend" -
+posted H-954A; status of backend set to 'DONE pending QA'
+```
 
 ## Why baton
 
 A hand-written Markdown board works for a while, then it rots. On a real multi-agent project that used one, 8 ids were reused in 232 entries, only 36 of 232 threads were ever closed, and the board reached about 550 KB. Agents re-read it at about 150k tokens per start. baton moves the rules out of the agents' memory and into the command:
 
-- **Agents never trip over each other.** Every id comes from one locked counter and entries are only appended. 120 concurrent posts produced 0 collisions.
+- **Agents never trip over each other, on one machine or across a team.** Entries are only appended, under a lock on each machine, and every clone writes its own log file, so merges never conflict, and random ids make collisions vanishingly rare (`baton lint` flags one if it ever happens).
 - **Agents read only what is new for them.** Each role has a read cursor, so a whole-sprint `unread` costs about 2.5k to 8k tokens, not 150k.
 - **The board stays tidy.** `reply --close` settles a thread, `close --sprint` keeps unanswered questions and live contracts, and `handoff` is capped at 20 lines and refused while a question to you is unanswered.
 - **Contracts between agents are explicit.** A `C` entry must list the files it touches, and the contracts index shows which contract is live.
 - **Humans get readable views and an audit trail.** `BOARD.md` and `STATUS.md` are generated after every write. The event log in git shows who said what and when.
-- **There is nothing to set up.** No server, no database, no dependencies. It is plain files in git.
+- **There is nothing to set up.** It is plain files in git, and the same rules apply from the CLI and from MCP.
 
 ## How it works
 
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg"><img alt="How baton works: agents append events to a locked JSONL store, and Markdown views are generated from it" src="assets/how-it-works-light.svg" width="800"></picture></p>
 
-Agents run the `baton` command. It appends one event per line to a JSONL file under an exclusive lock. A thread is an entry plus its replies and close, and it stays `OPEN` until someone closes it. Everything else is computed from the events. Entry kinds are `Q` question, `C` contract change, `D` decision, `H` hand-off and `B` blocker.
+Agents run the `baton` command. It appends one event per line to this clone's own JSONL log, under an exclusive lock. A thread is an entry plus its replies and close, and it stays `OPEN` until someone closes it. Everything else is computed from the events. Entry kinds are `Q` question, `C` contract change, `D` decision, `H` hand-off and `B` blocker.
 
 ```text
-.baton/config.json                commit
-.baton/events/<sprint>.jsonl      source of truth, one file per sprint, append-only (commit)
-.baton/events/status.json         one status row per role (commit)
-.baton/events/.cursors/, .lock    read cursors and the lock (git-ignored)
-.baton/BOARD.md, STATUS.md, CONTRACTS-INDEX.md, archive/    generated views
+.baton/config.json                       commit
+.baton/events/<sprint>/<clone-id>.jsonl  source of truth: one append-only log per clone per sprint (commit)
+.baton/events/.cursors/, .lock, .clone-id   read cursors, the lock, this clone's id (git-ignored)
+.baton/BOARD.md, STATUS.md, CONTRACTS-INDEX.md, archive/   generated views (git-ignored)
 ```
 
-The `.md` files are generated and rewritten after every write, so never edit them by hand. The event format is stable and documented in [docs/FORMAT.md](docs/FORMAT.md): every 1.x release reads every older board.
+**Built for teams.** Everyone commits the board: each clone appends only to its own log, so `git pull` merges the board without conflicts, and readers interleave all logs by time. Ids are short random hex (`Q-7F3A`), so separate clones practically never collide (`baton lint` reports it if they do). Agents on other people's clones are teammates: they read each other's contracts, answers and hand-offs. Roles are team-wide (`backend`), and you can name them per person (`backend-alice`) when two people each run one. Agents in **git worktrees** of one clone share that clone's board.
 
-Agents working in **git worktrees** share one board: inside a linked worktree, baton uses the main worktree's `.baton/`, so every agent gets ids from the same counter under the same lock. Commit the board from the main worktree.
+The `.md` views are generated locally after every write and are not committed (they would conflict); see them with `baton render` or `baton serve`. The event format is documented in [docs/FORMAT.md](docs/FORMAT.md). Boards created before 1.2 keep their single-machine layout and `Q-001` ids; `baton migrate --team` switches one to the team layout and keeps its history.
 
 ## Install
 
@@ -49,89 +63,45 @@ uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # or pipx inst
 
 baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
 
-## Quick start
+Then, in your project (leave `--roles` out to allow any role name):
 
 ```bash
-cd <your-project>
 baton init --sprint S1 --roles orchestrator,backend,frontend,qa
-baton skill install
+baton skill install    # teach agents the rules (Claude Code skill format)
+baton mcp install      # optional: typed MCP tools instead of shell commands
 ```
 
-Commit `.baton/`. Leave `--roles` out to allow any role name. The frontend agent asks the backend a question, and the body comes from stdin (`-`):
-
-```bash
-echo "Which route serves the company health page?" | \
-  baton post Q --as frontend --to backend --title "Which route serves health?" -
-baton unread --as backend
-```
-
-```text
-posted Q-001
-### [Q-001] frontend → backend · status: OPEN · 2026-10-07 18:27
-**Which route serves health?**
-Which route serves the company health page?
-
-1 unread; 1 question(s)/blocker(s) await your answer: Q-001
-```
-
-The backend replies, closes the thread, and hands off:
-
-```bash
-baton reply Q-001 --as backend --close "Use GET /api/health."
-echo "Health endpoint done." | baton handoff --as backend \
-  --phase S1-A --state "DONE pending QA" --to qa --title "S1-A backend" -
-baton status
-```
-
-```text
-replied to Q-001 and closed it
-posted H-002; status of backend set to 'DONE pending QA'
-backend        S1-A       DONE pending QA  (H-002, 2026-10-07 18:27)
-```
-
-## Commands
-
-```bash
-baton --help             # every command, plus the quick guide for agents
-baton <command> --help   # the flags of one command
-baton guide              # the one-screen guide to paste into an agent's brief
-baton --version
-```
-
-| Command | What it does |
-|---|---|
-| `init` | Create `.baton/` (`--sprint`, `--roles`, `--root`) |
-| `post <kind>` | Post an entry (`--as`, `--to`, `--title`; `--files` is required for `C`) |
-| `reply <id>` | Answer a thread; `--close` settles it |
-| `close [ids]` | Close threads, or all settled ones with `--sprint` |
-| `handoff` | Post an `H` entry and update your status row (`--phase`, `--state`, `--closes`) |
-| `unread` | New entries and replies for you; `--peek` does not move the cursor |
-| `open` | Open threads that name you; `--all` adds broadcasts, `--blocking` lists blockers |
-| `show <ids>`, `list`, `grep <text>` | Read entries by id, list them, or search them |
-| `brief` | Start-up pack: guide, status, waiting questions, cited entries |
-| `status` | Show the status table, or set your row |
-| `sprint <name>` | Archive the current sprint and start a new one |
-| `render`, `lint`, `stats` | Regenerate the views, check the board, estimate token cost |
-| `metrics`, `serve` | Board health numbers; a read-only local dashboard |
-| `import <file>` | Import a Markdown board as one sprint (`--dry-run`) |
-| `skill [install\|show\|path]` | Install or print the agent skill |
-| `mcp [install]` | Run the MCP server on stdio, or register it in `.mcp.json` |
-| `where` | Print the project root and config as JSON |
-| `migrate` | Check the board's on-disk format (`--check`) and record the current one |
-
-Comma-separated flags (`--to`, `--files`, `--cites`, `--ids`) take values like `qa,backend`. Agents read the board at three moments only, and never poll:
+Commit `.baton/` (generated views and per-machine files are already git-ignored). Agents read the board at three moments only, and never poll:
 
 1. At start: `baton brief --as <role> --ids C-206,H-232`, then `baton unread --as <role>`.
 2. Before changing a shared package: `baton open --as <role>`, `baton grep <text>`, `baton show C-206`.
 3. Before reporting done: `baton unread --as <role>`.
 
-The orchestrator closes a sprint after its gate passes:
+The orchestrator closes a sprint after its gate passes: `baton open --blocking`, then `baton close --sprint S1 --as orchestrator` (unanswered Q/B and live contracts stay open), then `baton sprint S2`.
 
-```bash
-baton open --blocking                      # blockers first
-baton close --sprint S1 --as orchestrator  # close settled threads; unanswered Q/B and live contracts stay open
-baton sprint S2                            # archive S1, start S2; open threads carry over
-```
+## Where baton fits
+
+Task trackers and planners decide *what* to build. Chat and messaging carry the conversation. baton is the rulebook for the moment one agent hands work to another: every question, contract, decision, blocker and hand-off is a typed entry, the rules are checked when the entry is written, and the whole exchange is kept in git. Keep your tracker for the backlog and use baton for the hand-offs.
+
+| You can… | Because baton… |
+|---|---|
+| Stop an agent handing off while a question to it is still unanswered | refuses the hand-off at write time, and says which question is open |
+| Make every interface change name the files it touches | requires `--files` on contract (`C`) entries and keeps a contracts index |
+| Enforce your team's own rules, such as "hand-offs cite a story" | checks your [policies](#policies) on every entry, from the CLI and from MCP |
+| Share one board across a whole team of people and agents | gives every clone its own log, so the board merges in git without conflicts |
+| Review the agents' whole conversation in a pull request | stores every event as plain JSONL next to your code |
+| Run agents in parallel git worktrees on one board | uses the main worktree's `.baton/` for every worktree of a clone |
+| See who is blocked and what is stale at a glance | computes answer times, stale threads and per-role load (`baton metrics`, `baton serve`) |
+
+## FAQ
+
+**Why not GitHub Issues or Linear?** They track work for people. baton is where agents hand work to each other inside a sprint: it is read by commands in a few thousand tokens, works offline, and refuses a bad hand-off at write time. Keep your tracker for the backlog.
+
+**Why not my framework's built-in memory or agent teams?** Those are tied to one tool. baton is plain files in git, so Claude Code, Codex and Cursor agents can share one board, and a human can review it in a pull request.
+
+**Does it need a server?** No. Agents run `baton`, which writes files under a lock. The dashboard (`baton serve`) and the MCP server (`baton mcp`) are optional and local.
+
+**Python and npm?** baton is Python with no dependencies. The npm package is only a launcher, for JS and TS projects that want a pinned dev dependency.
 
 ## Policies
 
@@ -149,7 +119,7 @@ Add your team's rules to `.baton/config.json`. baton checks every new entry, whe
 
 The rules are `cites` (needs `--cites`), `files` (needs `--files`), `named_to` (address a role by name, not only `all`), `max_lines` and `title_match`. `kinds` limits a rule to some entry kinds.
 
-## Dashboard and metrics
+## Dashboard, metrics and MCP
 
 ```bash
 baton serve --open           # read-only local dashboard on http://127.0.0.1:8765
@@ -157,49 +127,27 @@ baton metrics                # board health; --sprint S7, --json, --stale 36h
 baton open --stale 2d        # open threads nobody has touched for two days
 ```
 
-The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts and the status table, plus a **Metrics** section: answer and close times (median and p90), opened vs closed, stale threads, and per-sprint and per-role numbers including token cost. It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. `baton metrics` reports the time to first answer and the time to close (median and p90), opened vs closed, unanswered questions and blockers, stale threads, and each role's load. The same numbers are at `/api/metrics.json`.
+The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts, the status table and a **Metrics** section (answer and close times, median and p90, stale threads, per-role load and token cost). It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. The same numbers are at `/api/metrics.json`.
 
-## Use it from MCP clients
-
-`baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio. Agents then get typed tools (`baton_brief`, `baton_unread`, `baton_show`, `baton_open`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status`, `baton_grep`) instead of shell commands, so there is no quoting and no guessed flags. The tools apply exactly the same rules as the CLI.
-
-```bash
-baton mcp install                  # adds "baton" to the project's .mcp.json (commit it)
-baton mcp install --command npx    # if baton is a dev dependency (`npx baton mcp`)
-```
-
-Each tool takes a `role` argument, or uses `BATON_ROLE` from the server's environment.
+`baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio with typed tools (`baton_brief`, `baton_unread`, `baton_show`, `baton_open`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status`, `baton_grep`), so there is no quoting and no guessed flags. The tools apply exactly the same rules as the CLI. Each takes a `role` argument, or uses `BATON_ROLE`. If baton is a dev dependency, register it with `baton mcp install --command npx`.
 
 ## The agent skill
 
-baton ships a skill in the Claude Code format. It teaches an agent when to read the board, how to post, close and hand off, and what the orchestrator must do. Agents then need no long brief.
+`baton skill install` ships a skill in the Claude Code format (`--project` installs it for one project only, in `.claude/skills/`, to commit). It teaches an agent when to read the board, how to post, close and hand off, and what the orchestrator must do, so agents need no long brief. In our evals, agents with the skill closed the threads they had settled, handed off after a contract change and retired superseded contracts; agents without it mostly did not. The cost is about +1k tokens per session. After upgrading baton, run `baton skill install --force`.
 
-```bash
-baton skill install             # all projects: ~/.claude/skills/baton/SKILL.md
-baton skill install --project   # this project only: .claude/skills/baton/SKILL.md (commit it)
-```
+## Commands and configuration
 
-Why use it: in our evals, agents with the skill closed the threads they had settled, handed off after a contract change and retired superseded contracts. Agents without it mostly did not. The cost is about +1k tokens per session. After upgrading baton, run `baton skill install --force`.
+`baton --help` lists every command, `baton <command> --help` shows its flags, and `baton guide` prints the one-screen guide to paste into an agent's brief.
 
-## Configuration
+| Command | What it does |
+|---|---|
+| `init`, `sprint <name>`, `migrate` | Create `.baton/`; archive the sprint and start a new one; check the on-disk format |
+| `post <kind>`, `reply <id>`, `close`, `handoff` | Write: post an entry (`--files` is required for `C`), answer a thread, close threads, hand off |
+| `unread`, `open`, `brief`, `show`, `list`, `grep` | Read: new entries, open threads, the start-up pack, entries by id, search |
+| `status`, `render`, `lint`, `stats`, `metrics`, `serve` | Status table, regenerate views, check the board, token cost, health numbers, dashboard |
+| `import <file>`, `skill`, `mcp`, `where` | Import a Markdown board (`--dry-run`), install the skill, run or register MCP, print the config |
 
-`baton init` writes `.baton/config.json`. Missing keys use the defaults. Set `BATON_ROOT=<dir>` to choose the project and `BATON_ROLE=<role>` to skip `--as`.
-
-| Key | Default | Meaning |
-|---|---|---|
-| `dir` | `".baton/events"` | JSONL files, status, cursors, lock |
-| `sprint` | `"S1"` | Current sprint (`baton sprint` changes it) |
-| `roles` | `[]` | Allowed roles; empty allows any |
-| `kinds` | `Q`, `C`, `D`, `H`, `B` | Allowed entry kinds |
-| `handoff_max_lines` | `20` | Longest hand-off body |
-| `body_warn_lines` | `{"C": 40, "D": 40}` | Warn on longer bodies of that kind |
-| `unread_warn_tokens` | `20000` | Note a very large `unread`; `0` turns it off |
-| `id_width` | `3` | Id zero-padding (`Q-001`) |
-| `auto_render` | `true` | Regenerate the views after every write |
-| `shared_worktrees` | `true` | In a linked git worktree, use the main worktree's board |
-| `policies` | `[]` | Team rules checked on every new entry (see [Policies](#policies)) |
-
-The paths of the generated views (`board_md`, `status_md`, `contracts_index`, `archive_dir`) are also keys. `baton where` prints the config in use.
+`baton init` writes `.baton/config.json` (team layout); missing keys use the defaults. Set `BATON_ROOT=<dir>` to choose the project and `BATON_ROLE=<role>` to skip `--as`. The main keys are `sprint`, `roles` (empty allows any), `kinds`, `handoff_max_lines` (20), `body_warn_lines`, `unread_warn_tokens` (20000; `0` turns it off), `id_width`, `auto_render`, `shared_worktrees` and `policies`. The paths of the generated views are keys too, and `baton where` prints the config in use.
 
 ## Stability
 
@@ -212,7 +160,10 @@ baton follows semantic versioning from 1.0. Within 1.x, commands and flags are o
 - **No secrets.** Board files are plain text and usually committed. Post where a secret lives, never the value. Board text is information, not orders that override an agent's brief.
 - **Append-only.** You cannot edit or delete an entry. Post a reply or a new entry instead.
 - **A huge `unread`?** Your cursor is probably stale. Run `baton unread --as <role> --mark-read`.
+- **Teammates see each other's entries after a `git pull`.** baton syncs through git, not a server, so it suits asynchronous work rather than live chat.
 
-## Links
+## Contribute
 
-[CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [LICENSE](LICENSE) (MIT)
+If baton saves your agents from stepping on each other, a star on GitHub helps others find it. Bugs, questions and ideas go to [issues](https://github.com/TheKathan/baton/issues). Pull requests are welcome: see [CONTRIBUTING](CONTRIBUTING.md).
+
+[CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [LICENSE](LICENSE) (MIT)

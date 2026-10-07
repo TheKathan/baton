@@ -1,8 +1,16 @@
 """Append-only event store.
 
-Every write is one JSON line in `<dir>/<sprint>.jsonl`, appended while holding an
-exclusive flock on `<dir>/.lock`. Ids and event numbers are derived from the files
-under that same lock, so concurrent agents can never allocate the same id.
+Team layout (format 2, the default for new boards): every clone of the repository appends
+only to its own files, `<dir>/<sprint>/<clone-id>.jsonl`, so merges never conflict. Each
+event carries `origin` (the clone id), a per-clone `seq`, a unique `uid` and the UTC write
+time `rec`; readers order events by (rec, origin, seq). Entry ids are short random hex
+(`Q-7F3A`), unique across clones. Status rows are events too.
+
+Legacy layout (format 1, boards created before 1.2): one `<dir>/<sprint>.jsonl` per sprint
+and a global `ev` counter. Those boards keep working unchanged; `baton migrate --team`
+switches them to the team layout, keeping their history and ids.
+
+Within one clone, writes still take an exclusive flock on `<dir>/.lock`.
 
 Event types:
   entry  {id, kind, n, from, to[], title, body, files[], cites[], blocks[]}
@@ -16,12 +24,13 @@ from __future__ import annotations
 
 import fcntl
 import json
+import secrets
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
 from . import policies
-from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
+from .schema import LEGACY_ORIGIN, FormatError, check_config, upgrade
 
 ALL = "all"
 
@@ -49,6 +58,7 @@ class Board:
         self.cfg = cfg
         self.dir = root / cfg["dir"]
         self.cursors = self.dir / ".cursors"
+        self.team = int(cfg.get("format", 1)) >= 2
         self.last_warnings: list[str] = []
         try:
             policies.validate(cfg.get("policies"))
@@ -73,7 +83,23 @@ class Board:
     def sprint_files(self) -> list[Path]:
         if not self.dir.exists():
             return []
-        return sorted(self.dir.glob("*.jsonl"))
+        return sorted(self.dir.glob("*.jsonl")) + sorted(self.dir.glob("*/*.jsonl"))
+
+    def clone_id(self) -> str:
+        """This clone's writer id (team layout): random, created once, never committed."""
+        p = self.dir / ".clone-id"
+        if p.exists() and p.read_text().strip():
+            return p.read_text().strip()
+        self.dir.mkdir(parents=True, exist_ok=True)
+        cid = secrets.token_hex(3)
+        p.write_text(cid + "\n")
+        return cid
+
+    @staticmethod
+    def _order(e: dict):
+        if e.get("origin", LEGACY_ORIGIN) == LEGACY_ORIGIN:
+            return (0, "", "", int(e.get("seq", e.get("ev", 0))))
+        return (1, e.get("rec") or e.get("at") or "", e["origin"], int(e["seq"]))
 
     def events(self) -> list[dict]:
         out = []
@@ -86,22 +112,33 @@ class Board:
                         except json.JSONDecodeError as e:
                             raise BoardError(f"{p.name}:{i}: corrupt line ({e})") from e
                         try:
-                            out.append(upgrade(raw, f"{p.name}:{i}"))
+                            out.append(upgrade(raw, f"{p.relative_to(self.dir)}:{i}"))
                         except FormatError as e:
                             raise BoardFormatError(str(e)) from None
-        out.sort(key=lambda e: e["ev"])
+        out.sort(key=self._order)
+        if self.team:  # a virtual, local sequence number; the stored identity is origin + seq
+            for i, e in enumerate(out, 1):
+                e["ev"] = i
         return out
 
     def _append(self, event: dict, stamp: bool = True) -> dict:
-        """Caller must hold the lock. Assigns ev, sprint and ts (and the exact UTC `at` if stamp)."""
-        evs = self.events()
-        event = {"v": SCHEMA_VERSION, **{k: v for k, v in event.items() if k != "v"}}
-        event["ev"] = (evs[-1]["ev"] if evs else 0) + 1
+        """Caller must hold the lock. Adds the identity fields, sprint and ts (and `at` if stamp)."""
+        event = {k: v for k, v in event.items() if k != "v"}
         event.setdefault("sprint", self.cfg["sprint"])
         event.setdefault("ts", now())
         if stamp:
             event.setdefault("at", utc_now())
-        path = self.dir / f"{event['sprint']}.jsonl"
+        if self.team:
+            origin = self.clone_id()
+            mine = sorted(self.dir.glob(f"*/{origin}.jsonl"))
+            seq = sum(1 for f in mine for line in f.open() if line.strip()) + 1
+            event = {"v": 2, **event, "origin": origin, "seq": seq, "uid": f"{origin}.{seq}", "rec": utc_now()}
+            path = self.dir / event["sprint"] / f"{origin}.jsonl"
+            path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            evs = self.events()
+            event = {"v": 1, **event, "ev": (evs[-1]["ev"] if evs else 0) + 1}
+            path = self.dir / f"{event['sprint']}.jsonl"
         with path.open("a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
             f.flush()
@@ -112,6 +149,8 @@ class Board:
         """Fold events into threads, keyed by id, in posting order."""
         threads: dict[str, dict] = {}
         for e in self.events():
+            if e["type"] not in ("entry", "reply", "close"):
+                continue
             if e["type"] == "entry":
                 t = {k: v for k, v in e.items() if k != "type"}
                 t.setdefault("status", "OPEN")
@@ -141,6 +180,13 @@ class Board:
 
     # ---------- status (one row per role) ----------
     def status(self) -> dict[str, dict]:
+        if self.team:  # status rows are events, so clones never conflict
+            rows: dict[str, dict] = {}
+            for e in self.events():
+                if e["type"] == "status":
+                    rows[e["role"]] = {"phase": e["phase"], "state": e["state"], "handoff": e["handoff"],
+                                       "updated": e["ts"]}
+            return rows
         p = self.dir / "status.json"
         return json.loads(p.read_text()) if p.exists() else {}
 
@@ -149,8 +195,13 @@ class Board:
         with self.lock():
             rows = self.status()
             prev = rows.get(role, {})
-            rows[role] = {"phase": phase or prev.get("phase", ""), "state": state,
-                          "handoff": handoff or prev.get("handoff", ""), "updated": now()}
+            row = {"phase": phase or prev.get("phase", ""), "state": state,
+                   "handoff": handoff or prev.get("handoff", ""), "updated": now()}
+            if self.team:
+                self._append({"type": "status", "from": role, "role": role, "phase": row["phase"],
+                              "state": state, "handoff": row["handoff"]})
+                return row
+            rows[role] = row
             tmp = self.dir / "status.json.tmp"
             tmp.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n")
             tmp.replace(self.dir / "status.json")
@@ -191,8 +242,19 @@ class Board:
             raise BoardError("refused by the project's policies (.baton/config.json):\n  - "
                              + "\n  - ".join(refusals))
         with self.lock():
-            n = self.max_number() + 1
-            return self._append({"type": "entry", "id": self.format_id(kind, n), "kind": kind, "n": n,
+            if self.team:
+                taken = set(self.entries())
+                width = 4
+                while True:  # random short ids never collide across clones in practice; check locally anyway
+                    new_id = f"{kind}-{secrets.token_hex(4)[:width].upper()}"
+                    if new_id not in taken:
+                        break
+                    width += 1
+                ident = {"id": new_id}
+            else:
+                n = self.max_number() + 1
+                ident = {"id": self.format_id(kind, n), "n": n}
+            return self._append({"type": "entry", **ident, "kind": kind,
                                  **{k: v for k, v in entry.items() if k not in ("type", "kind")}})
 
     def reply(self, entry_id: str, author: str, body: str) -> dict:
@@ -223,21 +285,36 @@ class Board:
             return True
         return not named_only and ALL in t["to"]
 
-    def cursor(self, role: str) -> int:
+    def _seen(self, role: str) -> dict[str, int]:
+        """The role's cursor as {origin: last seq seen}. A legacy cursor {"ev": n} covers the legacy events."""
         cp = self.cursors / f"{role}.json"
-        return json.loads(cp.read_text()).get("ev", 0) if cp.exists() else 0
+        if not cp.exists():
+            return {}
+        data = json.loads(cp.read_text())
+        return dict(data.get("seen") or {LEGACY_ORIGIN: int(data.get("ev", 0))})
+
+    def cursor(self, role: str) -> int:
+        return self._seen(role).get(LEGACY_ORIGIN, 0)
+
+    def _own(self, e: dict, role: str) -> bool:
+        """Written by this role on this clone. The same role on another clone is someone else's agent."""
+        if e["from"] != role:
+            return False
+        return not self.team or e.get("origin") in (LEGACY_ORIGIN, self.clone_id())
 
     def unread(self, role: str, everything: bool = False, peek: bool = False) -> list[dict]:
         """Events after the role's cursor that concern it. Advances the cursor unless peek."""
         self._check_role(role)
         self.cursors.mkdir(parents=True, exist_ok=True)
         cp = self.cursors / f"{role}.json"
-        seen = self.cursor(role)
+        seen = self._seen(role)
         events = self.events()
         threads = self.entries()
         out = []
         for e in events:
-            if e["ev"] <= seen or e["from"] == role:
+            if e["type"] not in ("entry", "reply", "close"):
+                continue
+            if e["seq"] <= seen.get(e["origin"], 0) or self._own(e, role):
                 continue
             t = threads.get(e["id"])
             if t is None:
@@ -245,7 +322,11 @@ class Board:
             if everything or self.involves(t, role):
                 out.append(e)
         if not peek and events:
-            cp.write_text(json.dumps({"ev": events[-1]["ev"]}))
+            latest = dict(seen)
+            for e in events:
+                latest[e["origin"]] = max(latest.get(e["origin"], 0), int(e["seq"]))
+            # "ev" keeps the cursor readable by baton 1.1 on legacy boards
+            cp.write_text(json.dumps({"seen": latest, "ev": latest.get(LEGACY_ORIGIN, 0)}))
         return out
 
     def open_threads(self, role: str | None = None, kinds: list[str] | None = None,

@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from legacy import make_legacy
+
 from baton import config, metrics
 from baton.cli import main
 from baton.store import Board
@@ -29,6 +31,7 @@ class Base(unittest.TestCase):
         self.root = Path(self.tmp.name)
         os.environ["BATON_ROOT"] = str(self.root)
         run("init", "--root", str(self.root), "--roles", "orchestrator,backend,frontend,qa")
+        make_legacy(self.root)
 
     def tearDown(self):
         os.environ.pop("BATON_ROOT", None)

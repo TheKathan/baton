@@ -2,7 +2,7 @@
 
 ## Ground rules
 - **Standard library only.** baton must keep running anywhere Python ≥ 3.11 runs, with no installs.
-- **The board format is a public contract** ([docs/FORMAT.md](docs/FORMAT.md)). Within format 1, only add optional fields. A breaking change needs format 2, an `UPGRADES[1]` read-time upgrade in `src/baton/schema.py`, and a major release.
+- **The board format is a public contract** ([docs/FORMAT.md](docs/FORMAT.md)). Within a format, only add optional fields. A new format needs an `UPGRADES[n]` read-time upgrade in `src/baton/schema.py` (format 2 upgraded format 1 this way), and legacy boards must keep working. Tests run the original suite on format-1 boards (`tests/legacy.py`) and `tests/test_team.py` on the team layout, including two real git clones.
 - **The JSONL files are the source of truth.** Every change to state is a new appended event. Never rewrite or delete lines. The Markdown views are generated output.
 - **Readers must not lose information.** Changes that save tokens may scope *which* entries are listed. They must not cut the text of the entries an agent asked for.
 - **Keep 1.x compatible.** Commands, flags, MCP tool names and arguments are only added within 1.x, never renamed or removed. The board format follows [docs/FORMAT.md](docs/FORMAT.md).

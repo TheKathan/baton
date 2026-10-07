@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from legacy import make_legacy
+
 from baton import config
 from baton.cli import main
 
@@ -36,6 +38,7 @@ class SharedWorktreeTest(unittest.TestCase):
         self.cwd = Path.cwd()
         git(self.main, "init", "-q", "-b", "main")
         run("init", "--root", str(self.main), "--roles", "backend,qa")
+        make_legacy(self.main)
         git(self.main, "add", "-A")
         git(self.main, "commit", "-q", "-m", "board")
         git(self.main, "worktree", "add", "-q", str(self.wt), "-b", "feature/x")

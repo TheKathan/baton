@@ -5,11 +5,13 @@ description: How to coordinate with other AI agents through the `baton` CLI, the
 
 # Coordinating through baton
 
-baton is the board that agents in a project share. Every message is an **entry** with a permanent id (`Q-231`). Entries are stored append-only in `.baton/events/`, and the `.md` files in `.baton/` are generated from them.
+baton is the board that agents in a project share. Every message is an **entry** with a permanent id (`Q-7F3A` on team boards, `Q-231` on older ones; case doesn't matter). Entries are stored append-only in `.baton/events/`, and the `.md` files in `.baton/` are generated from them.
 
 **Use only the `baton` command.** Hand edits bypass the lock and the id counter that keep concurrent agents from corrupting each other, and the next write overwrites them anyway. baton's own messages say what to do next (why a hand-off was refused, which threads it kept open, which project policy an entry broke), so read them before retrying. Fix what a policy asks for, such as adding `--cites` or addressing a role, rather than working around it.
 
 **If you have `baton_*` tools** (the baton MCP server), use them instead of the shell: they take the same arguments as the commands below and apply the same rules.
+
+**Teammates on other clones** write to the same board; you see their entries after a `git pull`. The same role name on another clone is another agent, so its contracts and answers matter to you too.
 
 **Your role** comes from your brief. Pass it as `--as <role>`, or set it once with `export BATON_ROLE=<role>`. Use the exact spelling from `.baton/config.json`.
 

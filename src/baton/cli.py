@@ -99,17 +99,42 @@ def cmd_init(args) -> None:
     if args.dir:
         cfg["dir"] = args.dir
     cfg["roles"] = _csv(args.roles)
+    cfg["format"] = 2  # team layout: one log per clone, so a shared repo never conflicts
     config.save(root, cfg)
     board = Board(root, cfg)
-    board.dir.mkdir(parents=True, exist_ok=True)
-    gi = board.dir / ".gitignore"
-    if not gi.exists():
-        gi.write_text(".lock\n.cursors/\n*.tmp\n")
-    print(f"initialised {path} (board dir {cfg['dir']}, sprint {cfg['sprint']})")
+    _team_gitignores(board)
+    print(f"initialised {path} (board dir {cfg['dir']}, sprint {cfg['sprint']}, team layout)")
     try:
         render.render_all(board)
     except BoardError as e:
         print(f"note: views not rendered yet: {e}")
+
+
+LOCAL_FILES = (".lock", ".cursors/", ".clone-id", "*.tmp")
+
+
+def _team_gitignores(board: Board) -> list[str]:
+    """Ignore the per-machine files and the generated views (they would conflict between clones).
+
+    Returns the generated paths that git may still be tracking, for the user to untrack."""
+    board.dir.mkdir(parents=True, exist_ok=True)
+    gi = board.dir / ".gitignore"
+    have = gi.read_text().split() if gi.exists() else []
+    gi.write_text("\n".join(dict.fromkeys([*have, *LOCAL_FILES])) + "\n")
+    base = board.root / config.BATON_DIR
+    views = []
+    for key in ("board_md", "status_md", "contracts_index", "archive_dir"):
+        target = (board.root / board.cfg[key]).resolve()
+        try:
+            rel = target.relative_to(base.resolve()).as_posix()
+        except ValueError:
+            continue  # a custom path outside .baton/: left to the user
+        views.append(rel + ("/" if key == "archive_dir" else ""))
+    vg = base / ".gitignore"
+    existing = vg.read_text().split() if vg.exists() else []
+    vg.write_text("# generated views: render them locally (baton render / baton serve)\n"
+                  + "\n".join(dict.fromkeys([v for v in existing if not v.startswith("#")] + views)) + "\n")
+    return [f"{config.BATON_DIR}/{v}".rstrip("/") for v in views]
 
 
 def cmd_post(args) -> None:
@@ -328,10 +353,15 @@ def cmd_lint(args) -> None:
     board = _board(args)
     threads = board.entries()
     errors, warnings = [], []
-    nums = Counter(t["n"] for t in threads.values())
+    entry_ids = Counter(e["id"] for e in board.events() if e["type"] == "entry")
+    for dup, count in entry_ids.items():
+        if count > 1:
+            errors.append(f"{dup}: posted {count} times (from different clones?); "
+                          "reply under one of them and close the other")
+    nums = Counter(t["n"] for t in threads.values() if "n" in t)
     for t in threads.values():
         imported = t.get("imported")
-        if nums[t["n"]] > 1:
+        if "n" in t and nums[t["n"]] > 1:
             (warnings if imported else errors).append(f"{t['id']}: number {t['n']} is used by more than one entry")
         if t["kind"] not in board.cfg["kinds"]:
             (warnings if imported else errors).append(f"{t['id']}: unknown kind {t['kind']}")
@@ -447,32 +477,54 @@ def cmd_skill(args) -> None:
 
 
 def cmd_migrate(args) -> None:
-    """Report the board's on-disk format; record the current format in the config."""
+    """Report the board's on-disk format; record it in the config; --team switches to the team layout."""
     from .schema import SCHEMA_VERSION
     root = config.find_root()
     raw = json.loads((root / config.CONFIG_NAME).read_text())
+    cfg = config.load(root)
     versions: Counter = Counter()
     untagged = 0
-    for f in sorted((root / config.load(root)["dir"]).glob("*.jsonl")):
+    events_dir = root / cfg["dir"]
+    for f in sorted(events_dir.glob("*.jsonl")) + sorted(events_dir.glob("*/*.jsonl")):
         for line in f.read_text().splitlines():
             if line.strip():
                 event = json.loads(line)
                 versions[int(event.get("v", 1))] += 1
                 untagged += "v" not in event
-    print(f"baton reads format {SCHEMA_VERSION}; config says format {raw.get('format', '1 (unset)')}")
+    fmt = int(raw.get("format", 1))
+    layout = "team" if fmt >= 2 else "legacy single-machine"
+    print(f"baton reads formats up to {SCHEMA_VERSION}; this board is format {raw.get('format', '1 (unset)')} ({layout} layout)")
     print("events by format: " + (", ".join(f"v{v}: {n}" for v, n in sorted(versions.items())) or "none"))
     if untagged:
         print(f"{untagged} event(s) predate format tags (baton 0.x): read as format 1, unchanged on disk")
-    if max(versions, default=SCHEMA_VERSION) > SCHEMA_VERSION:
+    if max(versions, default=1) > SCHEMA_VERSION:
         raise BoardError(f"this board has events newer than format {SCHEMA_VERSION}; upgrade baton")
     if args.check:
+        if fmt < 2:
+            print("tip: `baton migrate --team` switches to the team layout, safe for repos with several clones")
         return
-    if raw.get("format") == SCHEMA_VERSION:
-        print("nothing to migrate")
+    if args.team and fmt < 2:
+        board = Board(root, cfg)
+        rows = board.status()  # the legacy status.json, carried over as status events
+        raw["format"] = 2
+        (root / config.CONFIG_NAME).write_text(json.dumps(raw, indent=2) + "\n")
+        board = Board(root, config.load(root))
+        for role, r in rows.items():
+            board.set_status(role, r.get("phase", ""), r.get("state", ""), r.get("handoff", ""))
+        tracked = _team_gitignores(board) + [f"{cfg['dir']}/status.json"]
+        render.render_all(board)
+        print(f"switched to the team layout (format 2): history and ids are kept; new writes go to "
+              f"{cfg['dir']}/<sprint>/{board.clone_id()}.jsonl; {len(rows)} status row(s) carried over")
+        print("now untrack the generated views and the old status file, then commit:\n"
+              f"  git rm -r -q --cached --ignore-unmatch {' '.join(tracked)}\n"
+              f"  git add .baton && git commit -m \"chore: baton team layout\"")
         return
-    raw["format"] = SCHEMA_VERSION
+    if raw.get("format") == fmt:
+        print("nothing to migrate" + ("" if fmt >= 2 else "; `baton migrate --team` switches to the team layout"))
+        return
+    raw["format"] = fmt
     (root / config.CONFIG_NAME).write_text(json.dumps(raw, indent=2) + "\n")
-    print(f"recorded format {SCHEMA_VERSION} in {config.CONFIG_NAME}; event files are never rewritten")
+    print(f"recorded format {fmt} in {config.CONFIG_NAME}; event files are never rewritten")
 
 
 def cmd_mcp(args) -> None:
@@ -513,7 +565,10 @@ def cmd_serve(args) -> None:
 def cmd_where(args) -> None:
     root, worktree = config.locate()
     board = Board(root, config.load(root))
-    info = {"root": str(board.root)}
+    info = {"root": str(board.root),
+            "layout": "team (format 2)" if board.team else "single-machine (format 1)"}
+    if board.team and (board.dir / ".clone-id").exists():
+        info["clone_id"] = board.clone_id()
     if worktree:
         info["shared_from_worktree"] = str(worktree)
     print(json.dumps({**info, **board.cfg}, indent=2))
@@ -633,8 +688,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--dir", help="install into <dir>/baton/SKILL.md")
     sp.add_argument("--force", action="store_true", help="replace a different existing copy")
 
-    sp = add("migrate", cmd_migrate, "check the board's on-disk format and record the current one")
+    sp = add("migrate", cmd_migrate, "check the board's format; --team switches to the team layout")
     sp.add_argument("--check", action="store_true", help="only report; change nothing")
+    sp.add_argument("--team", action="store_true",
+                    help="switch a legacy board to the team layout (keeps history and ids)")
 
     sp = add("metrics", cmd_metrics, "board health: answer/close times, stale threads, per-role load")
     sp.add_argument("--sprint", help="only this sprint (default: all)")

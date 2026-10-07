@@ -9,6 +9,8 @@ import unittest
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+from legacy import make_legacy
+
 from baton import config
 from baton.cli import main
 from baton.store import Board, BoardError
@@ -44,6 +46,7 @@ class BoardTest(unittest.TestCase):
         os.environ.pop("BATON_ROLE", None)
         run("init", "--root", str(self.root), "--sprint", "S1",
             "--roles", "orchestrator,backend,frontend,qa")
+        make_legacy(self.root)
 
     def tearDown(self):
         os.environ.pop("BATON_ROOT", None)

@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from legacy import make_legacy
+
 from baton.cli import main
 
 SRC = str(Path(__file__).resolve().parent.parent / "src")
@@ -26,6 +28,7 @@ class McpTest(unittest.TestCase):
         self.root = Path(self.tmp.name)
         os.environ["BATON_ROOT"] = str(self.root)
         run("init", "--root", str(self.root), "--roles", "orchestrator,backend,frontend,qa")
+        make_legacy(self.root)
 
     def tearDown(self):
         os.environ.pop("BATON_ROOT", None)
