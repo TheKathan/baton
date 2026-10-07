@@ -20,6 +20,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+from . import policies
 from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
 
 ALL = "all"
@@ -37,12 +38,22 @@ def now() -> str:
     return time.strftime("%Y-%m-%d %H:%M")
 
 
+def utc_now() -> str:
+    """Exact time in UTC (ISO 8601), stored as `at` next to the human-readable local `ts`."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
 class Board:
     def __init__(self, root: Path, cfg: dict):
         self.root = root
         self.cfg = cfg
         self.dir = root / cfg["dir"]
         self.cursors = self.dir / ".cursors"
+        self.last_warnings: list[str] = []
+        try:
+            policies.validate(cfg.get("policies"))
+        except policies.PolicyError as e:
+            raise BoardError(f".baton/config.json: {e}") from None
         try:
             check_config(cfg, str(root / ".baton/config.json"))
         except FormatError as e:
@@ -81,13 +92,15 @@ class Board:
         out.sort(key=lambda e: e["ev"])
         return out
 
-    def _append(self, event: dict) -> dict:
-        """Caller must hold the lock. Assigns ev, sprint and ts."""
+    def _append(self, event: dict, stamp: bool = True) -> dict:
+        """Caller must hold the lock. Assigns ev, sprint and ts (and the exact UTC `at` if stamp)."""
         evs = self.events()
         event = {"v": SCHEMA_VERSION, **{k: v for k, v in event.items() if k != "v"}}
         event["ev"] = (evs[-1]["ev"] if evs else 0) + 1
         event.setdefault("sprint", self.cfg["sprint"])
         event.setdefault("ts", now())
+        if stamp:
+            event.setdefault("at", utc_now())
         path = self.dir / f"{event['sprint']}.jsonl"
         with path.open("a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
@@ -102,16 +115,17 @@ class Board:
             if e["type"] == "entry":
                 t = {k: v for k, v in e.items() if k != "type"}
                 t.setdefault("status", "OPEN")
-                t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, last_ts=e["ts"])
+                t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, closed_at=None,
+                         last_ts=e["ts"], last_at=e.get("at"))
                 threads[e["id"]] = t
             elif e["id"] in threads:
                 t = threads[e["id"]]
-                t["last_ts"] = e["ts"]
+                t["last_ts"], t["last_at"] = e["ts"], e.get("at")
                 if e["type"] == "reply":
                     t["replies"].append(e)
                 elif e["type"] == "close":
                     t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
-                             closed_ts=e["ts"])
+                             closed_ts=e["ts"], closed_at=e.get("at"))
         return threads
 
     def get(self, entry_id: str) -> dict:
@@ -169,14 +183,17 @@ class Board:
             raise BoardError("--title is required")
         if kind == "C" and not files:
             raise BoardError("a contract change (C) must list the affected --files")
+        entry = {"type": "entry", "kind": kind, "from": author, "to": list(to) or [ALL],
+                 "title": title.strip(), "body": body.strip(), "files": list(files),
+                 "cites": list(cites), "blocks": list(blocks)}
+        refusals, self.last_warnings = policies.check(self.cfg.get("policies"), entry)
+        if refusals:
+            raise BoardError("refused by the project's policies (.baton/config.json):\n  - "
+                             + "\n  - ".join(refusals))
         with self.lock():
             n = self.max_number() + 1
-            return self._append({
-                "type": "entry", "id": self.format_id(kind, n), "kind": kind, "n": n,
-                "from": author, "to": list(to) or [ALL], "title": title.strip(),
-                "body": body.strip(), "files": list(files), "cites": list(cites),
-                "blocks": list(blocks),
-            })
+            return self._append({"type": "entry", "id": self.format_id(kind, n), "kind": kind, "n": n,
+                                 **{k: v for k, v in entry.items() if k not in ("type", "kind")}})
 
     def reply(self, entry_id: str, author: str, body: str) -> dict:
         self._check_role(author)
@@ -195,9 +212,9 @@ class Board:
             return self._append({"type": "close", "id": t["id"], "from": author, "reason": reason.strip()})
 
     def append_raw(self, event: dict) -> dict:
-        """Used by the importer: keeps the given id/n/ts/sprint."""
+        """Used by the importer: keeps the given id/n/ts/sprint and adds no `at`."""
         with self.lock():
-            return self._append(event)
+            return self._append(event, stamp=False)
 
     # ---------- reads per role ----------
     def involves(self, t: dict, role: str, named_only: bool = False) -> bool:

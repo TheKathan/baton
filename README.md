@@ -133,6 +133,22 @@ baton close --sprint S1 --as orchestrator  # close settled threads; unanswered Q
 baton sprint S2                            # archive S1, start S2; open threads carry over
 ```
 
+## Policies
+
+Add your team's rules to `.baton/config.json`. baton checks every new entry, whether it comes from the CLI or MCP: a `refuse` rule writes nothing and explains why, and a `warn` rule posts the entry and prints a warning. `baton lint` reports existing entries that break a rule.
+
+```json
+"policies": [
+  {"rule": "cites",       "kinds": ["H"],      "mode": "refuse"},
+  {"rule": "named_to",    "kinds": ["Q", "B"], "mode": "warn"},
+  {"rule": "max_lines",   "kinds": ["D"],      "lines": 15, "mode": "warn"},
+  {"rule": "title_match", "kinds": ["H"],      "pattern": "^S\\d+", "mode": "refuse",
+   "message": "hand-off titles start with the sprint, e.g. S7-A backend"}
+]
+```
+
+The rules are `cites` (needs `--cites`), `files` (needs `--files`), `named_to` (address a role by name, not only `all`), `max_lines` and `title_match`. `kinds` limits a rule to some entry kinds.
+
 ## Dashboard and metrics
 
 ```bash
@@ -181,6 +197,7 @@ Why use it: in our evals, agents with the skill closed the threads they had sett
 | `id_width` | `3` | Id zero-padding (`Q-001`) |
 | `auto_render` | `true` | Regenerate the views after every write |
 | `shared_worktrees` | `true` | In a linked git worktree, use the main worktree's board |
+| `policies` | `[]` | Team rules checked on every new entry (see [Policies](#policies)) |
 
 The paths of the generated views (`board_md`, `status_md`, `contracts_index`, `archive_dir`) are also keys. `baton where` prints the config in use.
 

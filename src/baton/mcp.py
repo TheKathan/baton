@@ -64,6 +64,23 @@ TOOLS = [
 ]
 
 
+def tools() -> list[dict]:
+    """TOOLS, with baton_post's kinds taken from the project's config (H goes through baton_handoff)."""
+    try:
+        kinds = [k for k in config.load(config.find_root())["kinds"] if k != "H"]
+    except (config.ConfigError, OSError, ValueError):
+        kinds = None
+    if not kinds:
+        return TOOLS
+    out = []
+    for t in TOOLS:
+        if t["name"] == "baton_post":
+            props = {**t["inputSchema"]["properties"], "kind": {"type": "string", "enum": kinds}}
+            t = {**t, "inputSchema": {**t["inputSchema"], "properties": props}}
+        out.append(t)
+    return out
+
+
 def _csv(values) -> str:
     return ",".join(values or [])
 
@@ -151,7 +168,7 @@ def handle(msg: dict) -> dict | None:
     if method == "ping":
         return ok({})
     if method == "tools/list":
-        return ok({"tools": TOOLS})
+        return ok({"tools": tools()})
     if method == "tools/call":
         params = msg.get("params") or {}
         text, is_error = call_tool(params.get("name", ""), params.get("arguments") or {})

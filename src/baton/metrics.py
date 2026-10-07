@@ -1,8 +1,9 @@
 """Board health metrics: how fast questions get answered, how threads close, who is loaded.
 
-All numbers come from the event log. Times are wall-clock hours between event timestamps
-(`YYYY-MM-DD HH:MM`, local time). Entries whose timestamps are missing or day-only (some
-imported ones) count in totals but not in time-based numbers.
+All numbers come from the event log. Times are hours between events. The exact UTC
+`at` field is used when present (baton >= 1.1), otherwise the local `ts` (`YYYY-MM-DD HH:MM`).
+Entries whose timestamps are missing or day-only (some imported ones) count in totals but not
+in time-based numbers.
 """
 
 from __future__ import annotations
@@ -34,8 +35,18 @@ def parse_duration(text: str) -> float:
     return value * {"d": 24, "h": 1, "m": 1 / 60}[unit]
 
 
-def hours_between(a: str | None, b: str | None) -> float | None:
-    start, end = parse_ts(a), parse_ts(b)
+def moment(ts: str | None, at: str | None = None) -> datetime | None:
+    """A local, naive datetime: from the exact UTC `at` if given, else the local `ts`."""
+    if at:
+        try:
+            return datetime.fromisoformat(at).astimezone().replace(tzinfo=None)
+        except ValueError:
+            pass
+    return parse_ts(ts)
+
+
+def hours_between(a: str | None, b: str | None, a_at: str | None = None, b_at: str | None = None) -> float | None:
+    start, end = moment(a, a_at), moment(b, b_at)
     if start is None or end is None or end < start:
         return None
     return (end - start).total_seconds() / 3600
@@ -43,7 +54,7 @@ def hours_between(a: str | None, b: str | None) -> float | None:
 
 def age_hours(t: dict, now: datetime) -> float | None:
     """Hours since the thread's last activity (entry, reply or close)."""
-    last = parse_ts(t.get("last_ts") or t["ts"])
+    last = moment(t.get("last_ts") or t["ts"], t.get("last_at") or t.get("at"))
     return None if last is None else max(0.0, (now - last).total_seconds() / 3600)
 
 
@@ -73,8 +84,10 @@ def _summary(threads: list[dict], now: datetime, stale_h: float) -> dict:
         "questions_and_blockers": len(asks),
         "answered": len(answered),
         "unanswered_open": sum(1 for t in asks if t["status"] == "OPEN" and not first_answer(t)),
-        "hours_to_first_answer": _stats([hours_between(t["ts"], first_answer(t)["ts"]) for t in answered]),
-        "hours_to_close": _stats([hours_between(t["ts"], t["closed_ts"]) for t in threads if t["closed_ts"]]),
+        "hours_to_first_answer": _stats([hours_between(t["ts"], first_answer(t)["ts"], t.get("at"),
+                                                       first_answer(t).get("at")) for t in answered]),
+        "hours_to_close": _stats([hours_between(t["ts"], t["closed_ts"], t.get("at"), t.get("closed_at"))
+                                  for t in threads if t["closed_ts"]]),
         "stale_open": len(stale),
         "stale_ids": [t["id"] for t in stale],
     }
@@ -106,7 +119,8 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
             "replies": sum(1 for t in scope for x in t["replies"] if x["from"] == r),
             "asked_of": len(asked),
             "answered": sum(1 for a in answers if a),
-            "hours_to_answer": _stats([hours_between(t["ts"], a["ts"]) for t, a in zip(asked, answers) if a]),
+            "hours_to_answer": _stats([hours_between(t["ts"], a["ts"], t.get("at"), a.get("at"))
+                                       for t, a in zip(asked, answers) if a]),
             "waiting_on": len(board.awaiting(r)),
             "open_owned": sum(1 for t in mine if t["status"] == "OPEN"),
             "unread": unread_count,
