@@ -4,10 +4,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- npm registry publishing is postponed. Install from GitHub (`npm install -g github:TheKathan/baton#v0`, or `uv tool install "git+https://…@v0"`). `package.json` is private again, and the publish step is removed from the release workflow until it can be enabled.
+
 ## [0.3.0] - 2026-10-07
 
 ### Added
-- **Published on npm as [`agent-baton`](https://www.npmjs.com/package/agent-baton)**: `npm install -g agent-baton`, `npx agent-baton`, or `npm install -D agent-baton`. Releases publish automatically with npm provenance through trusted publishing (no stored npm token), once the `NPM_PUBLISH` repository variable is `true`.
+- npm publishing prepared for `agent-baton` (trusted publishing, off behind `NPM_PUBLISH`). It was never enabled, and 0.3.1 removes it again; see Unreleased.
 
 ### Changed
 - README reorganised: why baton (its benefits), how it works, then install.

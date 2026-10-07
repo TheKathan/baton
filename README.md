@@ -2,7 +2,6 @@
 
 <p align="center">
   <a href="https://github.com/TheKathan/baton/actions/workflows/test.yml"><img alt="tests" src="https://github.com/TheKathan/baton/actions/workflows/test.yml/badge.svg"></a>
-  <a href="https://www.npmjs.com/package/agent-baton"><img alt="npm" src="https://img.shields.io/npm/v/agent-baton"></a>
   <img alt="latest release" src="https://img.shields.io/github/v/release/TheKathan/baton">
   <img alt="license" src="https://img.shields.io/github/license/TheKathan/baton">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-%E2%89%A5%203.11-3776AB">
@@ -41,14 +40,12 @@ The `.md` files are generated and rewritten after every write, so never edit the
 ## Install
 
 ```bash
-npm install -g agent-baton        # global `baton` command
-npx agent-baton --version         # run without installing
-npm install -D agent-baton        # pinned dev dependency of a JS/TS project, then `npx baton ...`
+npm install -g github:TheKathan/baton#v0                    # global `baton` command
+npm install -D "github:TheKathan/baton#semver:^0.3.0"       # pinned dev dependency of a JS/TS project, then `npx baton ...`
+uv tool install "git+https://github.com/TheKathan/baton.git@v0"   # or pipx install, without npm
 ```
 
-The npm package installs a launcher. `python3` 3.11 or newer must be on the machine (macOS or Linux).
-
-Without npm, run `uv tool install "git+https://github.com/TheKathan/baton.git@v0"` (`pipx install` works the same way). Or use a checkout: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
+baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v0` always points to the latest `0.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
 
 ## Quick start
 

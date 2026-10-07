@@ -22,7 +22,6 @@ concurrency:
 permissions:
   contents: write       # gh release create
   pull-requests: read   # trunk-semver looks up the merged PR's source branch
-  id-token: write       # npm trusted publishing (OIDC); no npm token is stored
 
 jobs:
   release:
@@ -43,7 +42,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-          registry-url: https://registry.npmjs.org
 
       - name: Test
         run: make test
@@ -88,19 +86,3 @@ jobs:
           fi
           python3 scripts/set_version.py --notes "$VERSION" > notes.md
           gh release create "$VERSION" --title "$VERSION" --notes-file notes.md --verify-tag
-
-      # Publishes agent-baton to npm with provenance, through trusted publishing (the package
-      # on npmjs.com trusts this repository, release.yml and the "release" environment).
-      # Off until the repository variable NPM_PUBLISH is "true"; skips versions already on npm.
-      - name: Publish to npm
-        if: vars.NPM_PUBLISH == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          npm install -g npm@11   # trusted publishing needs npm >= 11.5.1
-          if npm view "agent-baton@${VERSION#v}" version >/dev/null 2>&1; then
-            echo "agent-baton@${VERSION#v} is already on npm"
-            exit 0
-          fi
-          npm publish --provenance --access public
