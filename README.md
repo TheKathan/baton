@@ -198,4 +198,4 @@ baton follows semantic versioning from 1.0. Within 1.x, commands and flags are o
 
 ## Links
 
-[CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [LICENSE](LICENSE) (GPL-3.0)
+[CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [LICENSE](LICENSE) (MIT)
