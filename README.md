@@ -25,19 +25,18 @@ With baton, ids come from one locked counter (120 concurrent posts produced 0 co
 
 ## Install
 
-baton needs Python 3.11+ on macOS or Linux, and has no dependencies. The repository is private, so every option goes over SSH with your GitHub key.
+baton needs Python 3.11+ on macOS or Linux, and has no dependencies.
 
 | You want | Command |
 |---|---|
-| A global `baton` command | `uv tool install "git+ssh://git@github.com/TheKathan/baton.git@v0"` or `pipx install "git+ssh://git@github.com/TheKathan/baton.git@v0"` |
-| The same, through npm | `npm i -g "git+ssh://git@github.com/TheKathan/baton.git#v0"` |
-| A pinned dev dependency of a JS/TS project | `npm i -D "git+ssh://git@github.com/TheKathan/baton.git#semver:^0.2.0"`, then `npx baton ...` |
-| To run once, without installing | `uvx --from "git+ssh://git@github.com/TheKathan/baton.git@v0" baton --version` |
-| A checkout (editable install) | `git clone git@github.com:TheKathan/baton.git && cd baton && make install` |
+| A global `baton` command | `uv tool install "git+https://github.com/TheKathan/baton.git@v0"` or `pipx install "git+https://github.com/TheKathan/baton.git@v0"` |
+| The same, through npm | `npm i -g github:TheKathan/baton#v0` |
+| A pinned dev dependency of a JS/TS project | `npm i -D "github:TheKathan/baton#semver:^0.2.0"`, then `npx baton ...` |
+| To run once, without installing | `uvx --from "git+https://github.com/TheKathan/baton.git@v0" baton --version` |
+| A checkout (editable install) | `git clone https://github.com/TheKathan/baton.git && cd baton && make install` |
 
-- `v0` is a moving tag for the latest `0.x` release. Use an exact tag such as `v0.2.0` to pin.
+- `v0` is a moving tag for the latest `0.x` release. Use an exact tag such as `v0.2.2` to pin.
 - With npm, `#semver:^0.2.0` picks the newest matching tag, and your lockfile pins that commit. The npm package only installs a launcher; `python3` 3.11+ must already be on the machine.
-- If you reach GitHub through an SSH host alias (for example `git@github-work:`), use it in the URLs.
 
 Check the install with `baton --version`.
 
