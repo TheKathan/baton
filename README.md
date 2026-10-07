@@ -42,12 +42,12 @@ Agents working in **git worktrees** share one board: inside a linked worktree, b
 ## Install
 
 ```bash
-npm install -g github:TheKathan/baton#v0                    # global `baton` command
-npm install -D "github:TheKathan/baton#semver:^0.3.0"       # pinned dev dependency of a JS/TS project, then `npx baton ...`
-uv tool install "git+https://github.com/TheKathan/baton.git@v0"   # or pipx install, without npm
+npm install -g github:TheKathan/baton#v1                    # global `baton` command
+npm install -D "github:TheKathan/baton#semver:^1.0.0"       # pinned dev dependency of a JS/TS project, then `npx baton ...`
+uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # or pipx install, without npm
 ```
 
-baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v0` always points to the latest `0.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
+baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
 
 ## Quick start
 
@@ -183,6 +183,10 @@ Why use it: in our evals, agents with the skill closed the threads they had sett
 | `shared_worktrees` | `true` | In a linked git worktree, use the main worktree's board |
 
 The paths of the generated views (`board_md`, `status_md`, `contracts_index`, `archive_dir`) are also keys. `baton where` prints the config in use.
+
+## Stability
+
+baton follows semantic versioning from 1.0. Within 1.x, commands and flags are only added and never renamed or removed, MCP tool names and arguments stay compatible, and every release reads every older board (the format is in [docs/FORMAT.md](docs/FORMAT.md)).
 
 ## Limits
 

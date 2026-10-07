@@ -5,6 +5,7 @@
 - **The board format is a public contract** ([docs/FORMAT.md](docs/FORMAT.md)). Within format 1, only add optional fields. A breaking change needs format 2, an `UPGRADES[1]` read-time upgrade in `src/baton/schema.py`, and a major release.
 - **The JSONL files are the source of truth.** Every change to state is a new appended event. Never rewrite or delete lines. The Markdown views are generated output.
 - **Readers must not lose information.** Changes that save tokens may scope *which* entries are listed. They must not cut the text of the entries an agent asked for.
+- **Keep 1.x compatible.** Commands, flags, MCP tool names and arguments are only added within 1.x, never renamed or removed. The board format follows [docs/FORMAT.md](docs/FORMAT.md).
 - **Keep the CLI stable.** Agents' briefs and project protocols quote commands and flags. To rename something, keep the old spelling working as an alias for at least one minor version.
 
 ## Development
@@ -28,8 +29,9 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 
 ## Branches and releases
 - Never push to `main`. Open a pull request from a branch whose name picks the version bump ([trunk-semver](https://github.com/TheKathan/trunk-semver)):
-  - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v0.2.0` → `v0.3.0`);
-  - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version.
+  - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v1.2.0` → `v1.3.0`);
+  - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version;
+  - `release/X.Y.Z` releases exactly `vX.Y.Z`. Use it only for a new major version (as for `1.0.0`), and bump `major-version` in `release.yml` in the same PR.
 - Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
