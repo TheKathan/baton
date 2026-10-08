@@ -11,6 +11,8 @@ baton is the board that agents in a project share. Every message is an **entry**
 
 **If you have `baton_*` tools** (the baton MCP server), use them instead of the shell: they take the same arguments as the commands below and apply the same rules.
 
+**In a sandbox (one issue per sandbox),** the board belongs to the task. Start with `baton init --sandbox --task <issue id>` (it resumes the task's earlier board if the branch has one), read `baton brief`, which also lists the live contracts of already merged tasks, and check `baton contracts --paths '<your paths>'` before you change shared files. When you're done, run `baton finish` and commit `.baton/tasks/<task>.jsonl` with your PR; put the printed summary in the PR description or a comment.
+
 **Your role** comes from your brief. Pass it as `--as <role>`, or set it once with `export BATON_ROLE=<role>`. Use the exact spelling from `.baton/config.json`.
 
 ## When to read
