@@ -68,7 +68,7 @@ Then, in your project (leave `--roles` out to allow any role name):
 ```bash
 baton init --sprint S1 --roles orchestrator,backend,frontend,qa
 baton skill install    # teach agents the rules (Claude Code skill format)
-baton mcp install      # optional: typed MCP tools instead of shell commands
+baton mcp install      # optional: MCP tools, for agents that can't run shell commands
 ```
 
 Commit `.baton/`. Agents read the board at three moments only, and never poll:
@@ -149,7 +149,13 @@ baton open --stale 2d        # open threads nobody has touched for two days
 
 The dashboard shows blockers, the questions waiting on each role, open threads by idle time, live contracts, the status table and a **Metrics** section (answer and close times, median and p90, stale threads, per-role load and token cost). It refreshes every 30 s, accepts only GET requests, and binds to localhost unless you pass `--host`. The same numbers are at `/api/metrics.json`.
 
-`baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio with typed tools (`baton_brief`, `baton_unread`, `baton_show`, `baton_open`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status`, `baton_grep`), so there is no quoting and no guessed flags. The tools apply exactly the same rules as the CLI. Each takes a `role` argument, or uses `BATON_ROLE`. If baton is a dev dependency, register it with `baton mcp install --command npx`.
+**The `baton` command is the primary interface, and agents should prefer it.** For agents that can't run shell commands, `baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio, and its instructions tell clients to prefer the command when they can. Its tools map one to one onto the commands and apply exactly the same rules:
+
+- **Daily work:** `baton_brief`, `baton_unread`, `baton_show`, `baton_open` (`stale`), `baton_grep`, `baton_list`, `baton_post`, `baton_reply`, `baton_close`, `baton_handoff`, `baton_status` (read or set your row).
+- **Sandbox mode:** `baton_sandbox_start`, `baton_contracts`, `baton_finish`.
+- **Orchestrator:** `baton_close` with `sprint`, `baton_sprint`, `baton_metrics`, `baton_lint`.
+
+Each tool takes a `role` argument, or uses `BATON_ROLE`. If baton is a dev dependency, register it with `baton mcp install --command npx`.
 
 ## The agent skill
 
@@ -166,7 +172,7 @@ The dashboard shows blockers, the questions waiting on each role, open threads b
 | `unread`, `open`, `brief`, `show`, `list`, `grep` | Read: new entries, open threads, the start-up pack, entries by id, search |
 | `status`, `render`, `lint`, `stats`, `metrics`, `serve` | Status table, regenerate views, check the board, token cost, health numbers, dashboard |
 | `init --sandbox --task`, `finish`, `contracts` | One board per task: start or resume it, export it for the PR, list live contracts |
-| `import <file>`, `skill`, `mcp`, `where` | Import a Markdown board (`--dry-run`), install the skill, run or register MCP, print the config |
+| `import <file>`, `skill`, `mcp`, `where` | Import a Markdown board (`--dry-run`), install the skill, run or register the MCP server (for agents without a shell), print the config |
 
 `baton init` writes `.baton/config.json` (`baton init --sandbox` writes `.baton/sandbox.json`, which takes precedence in that checkout); missing keys use the defaults. Set `BATON_ROOT=<dir>` to choose the project and `BATON_ROLE=<role>` to skip `--as`. The main keys are `sprint`, `roles` (empty allows any), `kinds`, `handoff_max_lines` (20), `body_warn_lines`, `unread_warn_tokens` (20000; `0` turns it off), `id_width`, `auto_render`, `shared_worktrees` and `policies`. The paths of the generated views are keys too, and `baton where` prints the config in use.
 

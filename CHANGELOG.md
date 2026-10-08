@@ -10,6 +10,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   - `baton finish` exports the board to `.baton/tasks/<task>.jsonl` to commit with the PR (one file per task, so it never conflicts, and reviewers see the agents' questions, contracts, decisions and hand-offs). It prints a Markdown PR summary, `--summary FILE` writes it, and `--strict` exits 1 while questions or blockers are open.
   - `baton contracts [--paths GLOB]` and `baton brief` list the live contracts of other tasks merged into your branch.
   - No network, no sync, sequential ids: every existing rule applies unchanged.
+- **MCP covers every agent workflow**, for agents without a shell:
+  - sandbox tools: `baton_sandbox_start`, `baton_contracts`, `baton_finish`;
+  - orchestrator tools: `baton_list`, `baton_sprint`, `baton_metrics`, `baton_lint`;
+  - `baton_close` takes a `sprint`, `baton_open` takes `stale`, and `baton_status` can set your row.
+
+### Changed
+- **The `baton` command is the primary interface.** The skill, the README and the MCP server's own instructions tell agents to prefer the command when they can run shell commands, and to use the MCP tools only when they can't.
 
 ### Fixed
 - A reply or close that sorts before its entry is no longer dropped: threads are folded in two passes.
