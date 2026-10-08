@@ -24,6 +24,12 @@ This is the stable, on-disk format of a baton board. Boards are committed to git
 
 Inside a linked git worktree, baton uses the main worktree's `.baton/` (see the README).
 
+## Sandbox boards
+
+`baton init --sandbox --task <id>` writes `.baton/sandbox.json` (the same keys as `config.json`, plus `"sandbox": true` and `"task"`) and keeps the live board in `.baton/sandbox/`. Both are listed in `.git/info/exclude`. A sandbox board takes precedence over a project board in the same checkout. Its events carry an extra `task` field (string).
+
+`baton finish` writes every event of the task, in order, to `.baton/tasks/<task>.jsonl`, the file committed with the pull request. Its lines are ordinary events (as below). A later sandbox on the same task re-reads that file to resume. Other tasks fold it read-only to list its open `C` entries as live contracts (`<task>/<id>`); damaged lines are skipped.
+
 ## config.json
 
 A JSON object. Missing keys take these defaults:

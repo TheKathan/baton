@@ -9,6 +9,9 @@ from pathlib import Path
 
 BATON_DIR = ".baton"
 CONFIG_NAME = f"{BATON_DIR}/config.json"
+# A sandbox board (`baton init --sandbox --task X`): one board per task, local to this checkout.
+SANDBOX_NAME = f"{BATON_DIR}/sandbox.json"
+TASKS_DIR = f"{BATON_DIR}/tasks"  # exported task boards, committed in the PR branch
 
 DEFAULTS: dict = {
     "format": 1,  # board format version (docs/FORMAT.md); set by `baton init`
@@ -77,10 +80,13 @@ def locate(start: Path | None = None) -> tuple[Path, Path | None]:
     env = os.environ.get("BATON_ROOT")
     if env:
         root = Path(env).resolve()
-        if not (root / CONFIG_NAME).exists():
+        if not ((root / CONFIG_NAME).exists() or (root / SANDBOX_NAME).exists()):
             raise ConfigError(f"BATON_ROOT={env} has no {CONFIG_NAME}")
         return root, None
     here = (start or Path.cwd()).resolve()
+    sandbox = next((d for d in (here, *here.parents) if (d / SANDBOX_NAME).exists()), None)
+    if sandbox:  # a sandbox board is local to its checkout: never redirected
+        return sandbox, None
     found = next((d for d in (here, *here.parents) if (d / CONFIG_NAME).exists()), None)
     main = main_worktree(found or here)
     if (main and (main / CONFIG_NAME).exists() and (found is None or _shared(found))
@@ -96,8 +102,13 @@ def find_root(start: Path | None = None) -> Path:
     return locate(start)[0]
 
 
+def config_file(root: Path) -> Path:
+    """The sandbox config if this checkout has one, else the project config."""
+    return root / (SANDBOX_NAME if (root / SANDBOX_NAME).exists() else CONFIG_NAME)
+
+
 def load(root: Path) -> dict:
-    raw = json.loads((root / CONFIG_NAME).read_text())
+    raw = json.loads(config_file(root).read_text())
     cfg = {**DEFAULTS, **raw}
     cfg["kinds"] = {**raw.get("kinds", DEFAULTS["kinds"])}
     return cfg
@@ -105,4 +116,5 @@ def load(root: Path) -> dict:
 
 def save(root: Path, cfg: dict) -> None:
     (root / BATON_DIR).mkdir(parents=True, exist_ok=True)
-    (root / CONFIG_NAME).write_text(json.dumps(cfg, indent=2) + "\n")
+    path = root / (SANDBOX_NAME if cfg.get("sandbox") else CONFIG_NAME)
+    path.write_text(json.dumps(cfg, indent=2) + "\n")

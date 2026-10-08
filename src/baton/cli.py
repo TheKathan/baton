@@ -91,6 +91,12 @@ def _long_body_warnings(board: Board, t: dict) -> list[str]:
 # ---------------- commands ----------------
 def cmd_init(args) -> None:
     root = Path(args.root).resolve() if args.root else Path.cwd()
+    if args.sandbox or args.task:
+        from . import sandbox
+        if not (args.sandbox and args.task):
+            raise BoardError("a sandbox board needs both --sandbox and --task <issue id>, e.g. --task LIN-123")
+        print(sandbox.init(root, args.task, _csv(args.roles), force=args.force))
+        return
     path = root / config.CONFIG_NAME
     if path.exists() and not args.force:
         raise BoardError(f"{path} exists (use --force to overwrite)")
@@ -415,6 +421,15 @@ def cmd_brief(args) -> None:
         out.append("## Yours, replied to: close if settled\n")
         out += [f"- {render.one_line(t)} (last reply from {t['replies'][-1]['from']})" for t in candidates]
         out.append("")
+    from . import sandbox
+    others = sandbox.live_contracts(board.root, board.cfg.get("task", ""))
+    if others:
+        out.append(f"## Live contracts from other tasks ({len(others)})\n")
+        out += [f"- {t['ref']} · {t['title'] or render.first_line(t['body'])} · files: {', '.join(t.get('files', []))}"
+                for t in others[:20]]
+        if len(others) > 20:
+            out.append(f"- … {len(others) - 20} more: `baton contracts`")
+        out.append("")
     _, count = _unread_text(board, role, False, peek=True)
     out.append(f"{count} unread event(s); run `baton unread --as {role}` to read them.")
     print("\n".join(out))
@@ -480,7 +495,7 @@ def cmd_migrate(args) -> None:
     """Report the board's on-disk format; record it in the config; --team switches to the team layout."""
     from .schema import SCHEMA_VERSION
     root = config.find_root()
-    raw = json.loads((root / config.CONFIG_NAME).read_text())
+    raw = json.loads(config.config_file(root).read_text())
     cfg = config.load(root)
     versions: Counter = Counter()
     untagged = 0
@@ -507,7 +522,7 @@ def cmd_migrate(args) -> None:
         board = Board(root, cfg)
         rows = board.status()  # the legacy status.json, carried over as status events
         raw["format"] = 2
-        (root / config.CONFIG_NAME).write_text(json.dumps(raw, indent=2) + "\n")
+        config.config_file(root).write_text(json.dumps(raw, indent=2) + "\n")
         board = Board(root, config.load(root))
         for role, r in rows.items():
             board.set_status(role, r.get("phase", ""), r.get("state", ""), r.get("handoff", ""))
@@ -523,8 +538,8 @@ def cmd_migrate(args) -> None:
         print("nothing to migrate" + ("" if fmt >= 2 else "; `baton migrate --team` switches to the team layout"))
         return
     raw["format"] = fmt
-    (root / config.CONFIG_NAME).write_text(json.dumps(raw, indent=2) + "\n")
-    print(f"recorded format {fmt} in {config.CONFIG_NAME}; event files are never rewritten")
+    config.config_file(root).write_text(json.dumps(raw, indent=2) + "\n")
+    print(f"recorded format {fmt} in {config.config_file(root).relative_to(root)}; event files are never rewritten")
 
 
 def cmd_mcp(args) -> None:
@@ -560,6 +575,50 @@ def cmd_serve(args) -> None:
     """A read-only local dashboard of the board."""
     from . import serve
     serve.run(_board(args), host=args.host, port=args.port, open_browser=args.open)
+
+
+def cmd_finish(args) -> None:
+    """Sandbox boards: export the task's board to .baton/tasks/<task>.jsonl for the PR."""
+    from . import sandbox
+    board = _board(args)
+    if not board.cfg.get("sandbox"):
+        raise BoardError("`baton finish` is for sandbox boards (baton init --sandbox --task <id>)")
+    path, counts = sandbox.finish(board)
+    text = sandbox.summary(board)
+    if args.summary:
+        Path(args.summary).write_text(text + "\n")
+    print(f"wrote {path.relative_to(board.root)} ({counts['events']} events, {counts['threads']} threads): "
+          "commit it with your PR")
+    if args.summary:
+        print(f"wrote the PR summary to {args.summary}")
+    else:
+        print("\n" + text)
+    asks = counts["open_asks"]
+    if asks:
+        msg = f"{len(asks)} question(s)/blocker(s) still open: " + ", ".join(t["id"] for t in asks)
+        if args.strict:
+            raise BoardError(msg)
+        print(f"note: {msg}", file=sys.stderr)
+
+
+def cmd_contracts(args) -> None:
+    """Live contracts from other tasks' exported boards on this branch (and this board's own)."""
+    from . import sandbox
+    board = _board(args)
+    rows = sandbox.live_contracts(board.root, board.cfg.get("task", ""))
+    own = [t for t in board.entries().values() if t["kind"] == "C" and t["status"] == "OPEN"]
+    if args.paths:
+        import fnmatch
+        pats = _csv(args.paths)
+        def touches(t):
+            return any(fnmatch.fnmatch(f, p) for f in t.get("files", []) for p in pats)
+        rows, own = [t for t in rows if touches(t)], [t for t in own if touches(t)]
+    for t in own:
+        print(f"{render.one_line(t)} · files: {', '.join(t.get('files', []))}")
+    for t in rows:
+        print(f"[{t['ref']}] {t['from']} · {t['title'] or render.first_line(t['body'])} · files: "
+              f"{', '.join(t.get('files', []))}")
+    print(f"{len(own)} live contract(s) on this board, {len(rows)} from other tasks")
 
 
 def cmd_where(args) -> None:
@@ -598,6 +657,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--roles", help="comma-separated allowed roles (empty = any)")
     sp.add_argument("--root")
     sp.add_argument("--force", action="store_true")
+    sp.add_argument("--sandbox", action="store_true",
+                    help="a board for one task, local to this checkout (needs --task); see `baton finish`")
+    sp.add_argument("--task", help="with --sandbox: the issue id, e.g. LIN-123")
 
     sp = add("post", cmd_post, "post a new entry", role=True)
     sp.add_argument("kind", help="Q, C, D, H or B")
@@ -707,6 +769,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("action", choices=["serve", "install"], nargs="?", default="serve")
     sp.add_argument("--command", default="baton", help="command MCP clients run (default: baton)")
     sp.add_argument("--file", help="the .mcp.json to update (default: the project's)")
+
+    sp = add("finish", cmd_finish, "sandbox boards: export the board to .baton/tasks/<task>.jsonl for the PR")
+    sp.add_argument("--summary", metavar="FILE", help="write the Markdown PR summary to FILE instead of printing it")
+    sp.add_argument("--strict", action="store_true", help="exit 1 while questions or blockers are still open")
+
+    sp = add("contracts", cmd_contracts, "live contracts: this board's and other tasks' exported boards")
+    sp.add_argument("--paths", help="only contracts touching these globs, e.g. 'modules/network/**'")
 
     add("where", cmd_where, "print the project root and config")
     add("guide", lambda a: print(GUIDE), "print the agent quick guide")

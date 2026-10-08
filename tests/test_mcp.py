@@ -36,7 +36,7 @@ class McpTest(unittest.TestCase):
 
     def session(self, messages, role=None):
         """Run a real `baton mcp` process; return its responses keyed by id."""
-        env = {**os.environ, "PYTHONPATH": SRC, "BATON_ROOT": str(self.root)}
+        env = {**os.environ, "PYTHONPATH": SRC, "BATON_ROOT": os.environ.get("BATON_ROOT", str(self.root))}
         env.pop("BATON_ROLE", None)
         if role:
             env["BATON_ROLE"] = role
@@ -49,9 +49,9 @@ class McpTest(unittest.TestCase):
         return {m["id"]: m for m in out[:-1]}
 
     @staticmethod
-    def call(mid, name, **arguments):
+    def call(mid, tool, **arguments):
         return {"jsonrpc": "2.0", "id": mid, "method": "tools/call",
-                "params": {"name": name, "arguments": arguments}}
+                "params": {"name": tool, "arguments": arguments}}
 
     def text(self, resp):
         return resp["result"]["content"][0]["text"]
@@ -99,6 +99,61 @@ class McpTest(unittest.TestCase):
         self.assertIn("posted H-002", self.text(r[6]))
         self.assertIn("status: CLOSED", self.text(r[7]))
         self.assertTrue(r[8]["result"]["isError"])  # no role given and none in the environment
+
+    def test_orchestrator_tools(self):
+        r = self.session([
+            self.call(1, "baton_post", role="qa", kind="Q", to=["backend"], title="unanswered", body="x"),
+            self.call(2, "baton_post", role="orchestrator", kind="D", to=["all"], title="scope", body="x"),
+            self.call(3, "baton_list", kind="Q"),
+            self.call(4, "baton_status", role="backend", phase="S1", state="building"),
+            self.call(5, "baton_status"),
+            self.call(6, "baton_open", stale="0m"),
+            self.call(7, "baton_metrics"),
+            self.call(8, "baton_lint"),
+            self.call(9, "baton_close", role="orchestrator", sprint="S1", reason="gate passed"),
+            self.call(10, "baton_sprint", name="S2"),
+            self.call(11, "baton_list", status="open"),
+        ])
+        self.assertIn("unanswered", self.text(r[3]))
+        self.assertNotIn("scope", self.text(r[3]))
+        self.assertIn("building", self.text(r[5]))
+        self.assertIn("2 open", self.text(r[6]))
+        self.assertIn("Threads", self.text(r[7]))
+        self.assertIn("0 error(s)", self.text(r[8]))
+        self.assertIn("kept open (unanswered", self.text(r[9]))
+        self.assertIn("current sprint is now S2", self.text(r[10]))
+        self.assertIn("Q-001", self.text(r[11]))
+        self.assertNotIn("D-002", self.text(r[11]))
+
+    def test_sandbox_lifecycle_through_mcp(self):
+        import shutil
+        import subprocess as sp
+        repo = Path(self.tmp.name) / "repo"
+        repo.mkdir()
+        sp.run(["git", "init", "-q"], cwd=repo, check=True)
+        env_root = os.environ["BATON_ROOT"]
+        os.environ["BATON_ROOT"] = str(repo)
+        try:
+            r = self.session([
+                self.call(1, "baton_sandbox_start", task="LIN-5", roles=["backend", "qa"]),
+                self.call(2, "baton_post", role="backend", kind="C", to=["qa"], title="shape", body="x",
+                          files=["api.ts"]),
+                self.call(3, "baton_contracts", paths=["*.ts"]),
+                self.call(4, "baton_finish", strict=True),
+            ])
+            self.assertIn("sandbox board for LIN-5", self.text(r[1]))
+            self.assertIn("C-001", self.text(r[3]))
+            self.assertFalse(r[4]["result"]["isError"], self.text(r[4]))
+            self.assertIn("### baton: LIN-5", self.text(r[4]))
+            self.assertTrue((repo / ".baton/tasks/LIN-5.jsonl").exists())
+        finally:
+            os.environ["BATON_ROOT"] = env_root
+            shutil.rmtree(repo, ignore_errors=True)
+
+    def test_instructions_prefer_the_command(self):
+        r = self.session([{"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                           "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {}}}])
+        self.assertIn("prefer the `baton` command", r[1]["result"]["instructions"])
 
     def test_role_from_environment(self):
         r = self.session([self.call(1, "baton_post", kind="D", to=["all"], title="env role", body="x")],

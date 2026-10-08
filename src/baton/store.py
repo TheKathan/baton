@@ -125,6 +125,8 @@ class Board:
         """Caller must hold the lock. Adds the identity fields, sprint and ts (and `at` if stamp)."""
         event = {k: v for k, v in event.items() if k != "v"}
         event.setdefault("sprint", self.cfg["sprint"])
+        if self.cfg.get("task"):  # sandbox boards: every event records its task
+            event.setdefault("task", self.cfg["task"])
         event.setdefault("ts", now())
         if stamp:
             event.setdefault("at", utc_now())
@@ -147,25 +149,7 @@ class Board:
     # ---------- state ----------
     def entries(self) -> dict[str, dict]:
         """Fold events into threads, keyed by id, in posting order."""
-        threads: dict[str, dict] = {}
-        for e in self.events():
-            if e["type"] not in ("entry", "reply", "close"):
-                continue
-            if e["type"] == "entry":
-                t = {k: v for k, v in e.items() if k != "type"}
-                t.setdefault("status", "OPEN")
-                t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, closed_at=None,
-                         last_ts=e["ts"], last_at=e.get("at"))
-                threads[e["id"]] = t
-            elif e["id"] in threads:
-                t = threads[e["id"]]
-                t["last_ts"], t["last_at"] = e["ts"], e.get("at")
-                if e["type"] == "reply":
-                    t["replies"].append(e)
-                elif e["type"] == "close":
-                    t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
-                             closed_ts=e["ts"], closed_at=e.get("at"))
-        return threads
+        return fold(self.events())
 
     def get(self, entry_id: str) -> dict:
         threads = self.entries()
@@ -354,6 +338,30 @@ class Board:
         return [t for t in self.open_threads(role, ["Q", "B"], named_only=True)
                 if role in t["to"] and t["from"] != role
                 and not any(r["from"] == role for r in t["replies"])]
+
+
+def fold(events: list[dict]) -> dict[str, dict]:
+    """Fold an ordered event list into threads keyed by id. Replies or closes that arrive
+    before their entry are kept and attached (two passes), so ordering quirks never drop them."""
+    threads: dict[str, dict] = {}
+    for e in events:
+        if e["type"] == "entry":
+            t = {k: v for k, v in e.items() if k != "type"}
+            t.setdefault("status", "OPEN")
+            t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, closed_at=None,
+                     last_ts=e["ts"], last_at=e.get("at"))
+            threads[e["id"]] = t
+    for e in events:
+        t = threads.get(e.get("id"))
+        if t is None or e["type"] not in ("reply", "close"):
+            continue
+        t["last_ts"], t["last_at"] = e["ts"], e.get("at")
+        if e["type"] == "reply":
+            t["replies"].append(e)
+        else:
+            t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
+                     closed_ts=e["ts"], closed_at=e.get("at"))
+    return threads
 
 
 def normalise_id(entry_id: str) -> str:
