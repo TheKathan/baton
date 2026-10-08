@@ -1,5 +1,8 @@
 """A Model Context Protocol server for baton: `baton mcp`.
 
+The `baton` command is the primary interface; these tools exist for agents that cannot run
+shell commands, and the server's instructions tell clients to prefer the command.
+
 It speaks JSON-RPC 2.0 over stdio, one message per line, using only the standard library.
 Every tool runs the matching `baton` command in-process, so the same rules apply: the
 hand-off cap, the unanswered-question check, `C` entries needing files, and so on.
@@ -41,7 +44,8 @@ TOOLS = [
           {"ids": _IDS}, ["ids"]),
     _tool("baton_open", "Open threads you wrote or are named in (all=true adds broadcasts; "
           "blocking=true lists only blockers).",
-          {"role": _ROLE, "all": {"type": "boolean"}, "blocking": {"type": "boolean"}}),
+          {"role": _ROLE, "all": {"type": "boolean"}, "blocking": {"type": "boolean"},
+           "stale": {"type": "string", "description": "only threads idle at least this long, e.g. 2d, 36h"}}),
     _tool("baton_post", "Post a new entry. kind: Q question, C contract change (needs files), "
           "D decision, B blocker. Address roles by name.",
           {"role": _ROLE, "kind": {"type": "string", "enum": ["Q", "C", "D", "B"]},
@@ -51,16 +55,35 @@ TOOLS = [
     _tool("baton_reply", "Answer a thread; close=true also closes it as settled.",
           {"role": _ROLE, "id": {"type": "string"}, "body": {"type": "string"},
            "close": {"type": "boolean"}}, ["id", "body"]),
-    _tool("baton_close", "Close threads that are settled (answered, fixed or superseded).",
-          {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"}}, ["ids"]),
+    _tool("baton_close", "Close threads that are settled (answered, fixed or superseded). Orchestrators: "
+          "pass sprint to close every settled thread of a sprint (unanswered Q/B and live contracts stay open).",
+          {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"}, "sprint": {"type": "string"}}),
     _tool("baton_handoff", "Hand off finished work (at most 20 lines) and update your status row. "
           "Refused while a question addressed to you is unanswered.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"},
            "to": _STRS, "title": {"type": "string"}, "body": {"type": "string"},
            "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"}},
           ["phase", "state", "to", "title", "body"]),
-    _tool("baton_status", "The status table: one row per role.", {}),
+    _tool("baton_status", "The status table: one row per role. Pass role and state to set your own row.",
+          {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"}}),
     _tool("baton_grep", "Search titles, bodies and replies.", {"text": {"type": "string"}}, ["text"]),
+    _tool("baton_list", "One line per entry, with filters.",
+          {"sprint": {"type": "string"}, "kind": {"type": "string", "description": "e.g. C or Q,B"},
+           "status": {"type": "string", "enum": ["open", "closed"]}, "role": _ROLE}),
+    _tool("baton_contracts", "Live contracts: this board's and those of other tasks merged into the branch.",
+          {"paths": {**_STRS, "description": "only contracts touching these globs, e.g. modules/network/**"}}),
+    _tool("baton_sandbox_start", "Sandbox mode: create this task's board, or resume it from "
+          ".baton/tasks/<task>.jsonl. Run once at the start of a sandbox.",
+          {"task": {"type": "string", "description": "the issue id, e.g. LIN-123"}, "roles": _STRS,
+           "force": {"type": "boolean"}}, ["task"]),
+    _tool("baton_finish", "Sandbox mode: export the task's board to .baton/tasks/<task>.jsonl (commit it with "
+          "the PR) and return the PR summary. strict=true fails while questions or blockers are open.",
+          {"strict": {"type": "boolean"}}),
+    _tool("baton_sprint", "Orchestrators: archive the current sprint and start a new one.",
+          {"name": {"type": "string", "description": "the new sprint, e.g. S2"}}, ["name"]),
+    _tool("baton_metrics", "Board health: answer and close times, stale threads, per-role load.",
+          {"sprint": {"type": "string"}, "stale": {"type": "string"}}),
+    _tool("baton_lint", "Check the board: duplicate ids, unknown kinds, contracts without files, policies.", {}),
 ]
 
 
@@ -95,7 +118,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
         return ["show", *a["ids"]]
     if name == "baton_open":
         return (["open", *role] + (["--all"] if a.get("all") else [])
-                + (["--blocking"] if a.get("blocking") else []))
+                + (["--blocking"] if a.get("blocking") else []) + (["--stale", a["stale"]] if a.get("stale") else []))
     if name == "baton_post":
         out = ["post", a["kind"], *role, "--to", _csv(a["to"]), "--title", a["title"], "--body-file", body_file]
         for key in ("files", "cites", "blocks"):
@@ -105,7 +128,8 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
     if name == "baton_reply":
         return ["reply", a["id"], *role, "--body-file", body_file] + (["--close"] if a.get("close") else [])
     if name == "baton_close":
-        return ["close", *a["ids"], *role] + (["--reason", a["reason"]] if a.get("reason") else [])
+        return (["close", *(a.get("ids") or []), *role] + (["--sprint", a["sprint"]] if a.get("sprint") else [])
+                + (["--reason", a["reason"]] if a.get("reason") else []))
     if name == "baton_handoff":
         out = ["handoff", *role, "--phase", a["phase"], "--state", a["state"], "--to", _csv(a["to"]),
                "--title", a["title"], "--body-file", body_file]
@@ -114,9 +138,36 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
                 out += [f"--{key}", _csv(a[key])]
         return out + (["--force"] if a.get("force") else [])
     if name == "baton_status":
+        if a.get("state"):
+            return ["status", *role, "--state", a["state"]] + (["--phase", a["phase"]] if a.get("phase") else [])
         return ["status"]
     if name == "baton_grep":
         return ["grep", a["text"]]
+    if name == "baton_list":
+        out = ["list"]
+        for key in ("sprint", "kind", "status"):
+            if a.get(key):
+                out += [f"--{key}", a[key]]
+        return out + role
+    if name == "baton_contracts":
+        return ["contracts"] + (["--paths", _csv(a["paths"])] if a.get("paths") else [])
+    if name == "baton_sandbox_start":
+        root = os.environ.get("BATON_ROOT") or os.getcwd()
+        return (["init", "--sandbox", "--task", a["task"], "--root", root]
+                + (["--roles", _csv(a["roles"])] if a.get("roles") else [])
+                + (["--force"] if a.get("force") else []))
+    if name == "baton_finish":
+        return ["finish"] + (["--strict"] if a.get("strict") else [])
+    if name == "baton_sprint":
+        return ["sprint", a["name"]]
+    if name == "baton_metrics":
+        out = ["metrics"]
+        for key in ("sprint", "stale"):
+            if a.get(key):
+                out += [f"--{key}", a[key]]
+        return out
+    if name == "baton_lint":
+        return ["lint"]
     raise KeyError(name)
 
 
@@ -164,7 +215,9 @@ def handle(msg: dict) -> dict | None:
         return ok({"protocolVersion": asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0],
                    "capabilities": {"tools": {}},
                    "serverInfo": {"name": "baton", "version": __version__},
-                   "instructions": "baton is this project's coordination board.\n" + GUIDE})
+                   "instructions": ("baton is this project's coordination board. If you can run shell commands, "
+                                    "prefer the `baton` command (it is the primary interface and has every option); "
+                                    "these tools are the same commands for agents without a shell.\n" + GUIDE)})
     if method == "ping":
         return ok({})
     if method == "tools/list":
