@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-08
+
 ### Added
 - **Sandbox mode: one board per task**, for AI developers that work each issue in its own short-lived sandbox.
   - `baton init --sandbox --task LIN-123` creates the task's board locally (`.baton/sandbox*`, excluded through `.git/info/exclude`), or resumes it from `.baton/tasks/LIN-123.jsonl` without replaying the history.
