@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-13
+
 ### Added
 - **Refusals are measured.** Every refused write (a hand-off on an open question or over the cap, a contract without files, a policy) and every `--force` override is recorded in `<dir>/.local/refusals.jsonl`. The log is local and git-ignored (baton adds `.local/` to the board's `.gitignore`), so the board still holds only what was written. `baton metrics` and the dashboard report refused writes, forced ones, and how many refused hand-offs were resolved by answering the question. A sandbox's `finish` summary says how many writes were refused.
 - **Closing is part of the flow.** Hand-offs record their `--phase`, and `baton close --phase S8-A` closes a phase's hand-offs once it passes its gate. `baton brief` lists the hand-offs to you that are still open, and `baton handoff` notes them, so whoever checks the work closes it (with `--closes`).
