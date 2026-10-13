@@ -17,6 +17,7 @@ A breaking change would create format 2, together with a read-time upgrade from 
 .baton/events/status.json        one status row per role
 .baton/events/.lock              lock file (flock); git-ignored
 .baton/events/.cursors/<role>.json   per-role read cursor; git-ignored
+.baton/events/.local/refusals.jsonl  local log of refused writes (baton ≥ 1.3); git-ignored, not part of the board
 .baton/*.md, .baton/archive/*.md generated views; never parsed back
 ```
 
@@ -73,6 +74,8 @@ Every line of a sprint file is one event. All events carry these fields:
 | `to` | array of strings | Addressed roles, or `["all"]` |
 | `title`, `body` | string | Text. `title` may be empty on imported entries |
 | `files`, `cites`, `blocks` | arrays of strings | Affected files (required for `C`), cited ids, and what the entry blocks |
+| `phase` | string | Optional (baton ≥ 1.3): on `H` entries, the `--phase` of the hand-off |
+| `supersedes` | array of strings | Optional (baton ≥ 1.3): on `C` entries, the contracts this one replaces. baton closes them in the same command |
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |
 

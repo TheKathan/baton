@@ -168,7 +168,9 @@ class BoardTest(unittest.TestCase):
         self.assertEqual(b.get("H-212")["to"], ["qa"])
         lint = run("lint")
         self.assertIn("0 error(s)", lint)
-        self.assertIn("number 205", lint)
+        self.assertIn("5 imported entries skipped", lint)  # old history is noise by default
+        self.assertNotIn("number 205", lint)
+        self.assertIn("number 205", run("lint", "--all"))
         self.assertIn("posted Q-213", run("post", "Q", "--as", "qa", "--title", "after import", "x"))
         again = run("import", str(md), "--sprint", "S5", "--dry-run")
         self.assertIn("D-205 → D-205~2", again)

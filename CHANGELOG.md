@@ -4,6 +4,20 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Refusals are measured.** Every refused write (a hand-off on an open question or over the cap, a contract without files, a policy) and every `--force` override is recorded in `<dir>/.local/refusals.jsonl`. The log is local and git-ignored (baton adds `.local/` to the board's `.gitignore`), so the board still holds only what was written. `baton metrics` and the dashboard report refused writes, forced ones, and how many refused hand-offs were resolved by answering the question. A sandbox's `finish` summary says how many writes were refused.
+- **Closing is part of the flow.** Hand-offs record their `--phase`, and `baton close --phase S8-A` closes a phase's hand-offs once it passes its gate. `baton brief` lists the hand-offs to you that are still open, and `baton handoff` notes them, so whoever checks the work closes it (with `--closes`).
+- **`baton post C --supersedes C-240`** cites and closes the contract it replaces in one command, so only one shape stays live.
+- **`baton lint --suggest`** proposes policies that most of the board's own entries already follow (cites, files, named roles, title patterns), as a config snippet to accept or ignore.
+- MCP: `baton_post` takes `supersedes`, `baton_close` takes `phase`, `baton_lint` takes `all` and `suggest`.
+
+### Changed
+- **Open contracts are no longer counted as stale.** A contract stays open while it holds. `baton metrics` lists them separately as *quiet contracts*: open `C` entries that nobody has replied to or cited for the stale period.
+- **`baton lint` skips imported entries** by default, since their problems were reported at import time. `--all` checks them too.
+- **Sandbox boards inherit the team's settings.** `baton init --sandbox` copies `policies`, `kinds`, `roles` (unless `--roles` is given) and the limits from the project's `.baton/config.json`, so project rules apply in every sandbox.
+- The README's *Why* section adds the first measurements from a project that moved from a hand-written board to baton.
+- **The README is shorter; the details moved to guides:** [sandbox mode](docs/sandbox.md), [commands](docs/commands.md), [policies](docs/policies.md) and [configuration](docs/configuration.md). A test checks that every `baton <command> --flag` in the docs exists and that relative links resolve.
+
 ## [1.2.0] - 2026-10-08
 
 ### Added

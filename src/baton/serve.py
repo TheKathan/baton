@@ -84,7 +84,7 @@ def page(title: str, body: str) -> str:
 
 
 def dashboard(board: Board) -> str:
-    now = datetime.now()  # noqa: DTZ005 - board times are local wall-clock
+    now = datetime.now()
     m = metrics.compute(board, now=now)
     s = m["summary"]
     threads = board.entries()
@@ -110,6 +110,7 @@ def dashboard(board: Board) -> str:
     def stat(x):
         return (f'{x["median"]}h', f'p90 {x["p90"]}h · n={x["n"]}') if x["n"] else ("—", "no data yet")
     fa, cl = stat(s["hours_to_first_answer"]), stat(s["hours_to_close"])
+    rf = s["refusals"]
     health = [
         ("Time to first answer (median)", fa[0], fa[1], ""),
         ("Time to close (median)", cl[0], cl[1], ""),
@@ -120,6 +121,12 @@ def dashboard(board: Board) -> str:
         (f'Stale (idle ≥ {m["stale_hours"]:g}h)', s["stale_open"],
          ", ".join(s["stale_ids"][:6]) + (" …" if len(s["stale_ids"]) > 6 else "") or "none",
          "warn" if s["stale_open"] else "ok"),
+        (f'Quiet contracts (≥ {m["stale_hours"]:g}h)', s["quiet_contracts"],
+         ", ".join(s["quiet_contract_ids"][:6]) + (" …" if len(s["quiet_contract_ids"]) > 6 else "") or "none",
+         "warn" if s["quiet_contracts"] else "ok"),
+        ("Refused writes", rf["refused"],
+         (f'{rf["resolved_by_answering"]} of {rf["handoffs_on_open_questions"]} hand-offs resolved by answering; '
+          f'{rf["overridden"]} forced'), ""),
         ("Unread now (all roles)", sum(x["unread"] for x in m["roles"].values()),
          f'~{sum(x["unread_tokens"] for x in m["roles"].values())} tokens to read', ""),
     ]
@@ -163,7 +170,7 @@ def entry_page(board: Board, entry_id: str) -> str:
 
 
 def board_json(board: Board) -> dict:
-    now = datetime.now()  # noqa: DTZ005 - board times are local wall-clock
+    now = datetime.now()
     open_ = [t for t in board.entries().values() if t["status"] == "OPEN"]
     return {"sprint": board.cfg["sprint"], "status": board.status(),
             "open": [{"id": t["id"], "kind": t["kind"], "from": t["from"], "to": t["to"],

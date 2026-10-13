@@ -21,7 +21,7 @@ STALE_DEFAULT_HOURS = 48.0
 def parse_ts(ts: str | None) -> datetime | None:
     """Minute-precision timestamps only; day-only or unknown dates give None."""
     try:
-        return datetime.strptime(ts or "", "%Y-%m-%d %H:%M")  # noqa: DTZ007 - board times are local wall-clock
+        return datetime.strptime(ts or "", "%Y-%m-%d %H:%M")
     except ValueError:
         return None
 
@@ -70,11 +70,20 @@ def _stats(values: list[float]) -> dict:
             "p90": round(values[min(len(values) - 1, int(len(values) * 0.9))], 1)}
 
 
-def _summary(threads: list[dict], now: datetime, stale_h: float) -> dict:
+def quiet_hours(t: dict, every: list[dict], now: datetime) -> float | None:
+    """Hours since a contract was last touched: its own activity, or a later entry citing it."""
+    ages = [age_hours(t, now)] + [age_hours(x, now) for x in every if t["id"] in (x.get("cites") or [])]
+    ages = [a for a in ages if a is not None]
+    return min(ages) if ages else None
+
+
+def _summary(threads: list[dict], now: datetime, stale_h: float, every: list[dict] | None = None) -> dict:
     asks = [t for t in threads if t["kind"] in ("Q", "B")]
     open_ = [t for t in threads if t["status"] == "OPEN"]
     answered = [t for t in asks if first_answer(t)]
-    stale = [t for t in open_ if (age_hours(t, now) or 0) >= stale_h]
+    # an open contract is live by design, not stale; it is "quiet" when nothing has cited it lately
+    stale = [t for t in open_ if t["kind"] != "C" and (age_hours(t, now) or 0) >= stale_h]
+    quiet = [t for t in open_ if t["kind"] == "C" and (quiet_hours(t, every or threads, now) or 0) >= stale_h]
     return {
         "entries": len(threads),
         "by_kind": {k: sum(t["kind"] == k for t in threads) for k in sorted({t["kind"] for t in threads})},
@@ -90,7 +99,28 @@ def _summary(threads: list[dict], now: datetime, stale_h: float) -> dict:
                                   for t in threads if t["closed_ts"]]),
         "stale_open": len(stale),
         "stale_ids": [t["id"] for t in stale],
+        "quiet_contracts": len(quiet),
+        "quiet_contract_ids": [t["id"] for t in quiet],
     }
+
+
+def refusal_stats(board: Board, sprint: str | None = None) -> dict:
+    """Writes baton refused (from the local log), and how refused hand-offs were resolved."""
+    rows = [r for r in board.refusals() if sprint is None or r.get("sprint") == sprint]
+    refused = [r for r in rows if not r.get("forced")]
+    threads = board.entries()
+
+    def resolved(r):  # every question that blocked the hand-off now has an answer from that role, or is closed
+        ids = r.get("waiting") or []
+        return bool(ids) and all(threads.get(i, {}).get("status") == "CLOSED"
+                                 or any(x["from"] == r["role"] for x in threads.get(i, {}).get("replies", []))
+                                 for i in ids)
+    by_rule: dict[str, int] = {}
+    for r in refused:
+        by_rule[r["what"]] = by_rule.get(r["what"], 0) + 1
+    handoffs = [r for r in refused if r["what"] == "handoff" and r.get("waiting")]
+    return {"refused": len(refused), "by_rule": by_rule, "overridden": len(rows) - len(refused),
+            "handoffs_on_open_questions": len(handoffs), "resolved_by_answering": sum(map(resolved, handoffs))}
 
 
 def _tokens(text: str) -> int:
@@ -99,7 +129,7 @@ def _tokens(text: str) -> int:
 
 def compute(board: Board, sprint: str | None = None, now: datetime | None = None,
             stale_hours: float = STALE_DEFAULT_HOURS) -> dict:
-    now = now or datetime.now()  # noqa: DTZ005 - compared with local wall-clock board times
+    now = now or datetime.now()
     every = list(board.entries().values())
     scope = [t for t in every if sprint is None or t["sprint"] == sprint]
     sprints: dict[str, list[dict]] = {}
@@ -131,8 +161,8 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
         "current_sprint": board.cfg["sprint"],
         "scope": sprint or "all sprints",
         "stale_hours": stale_hours,
-        "summary": _summary(scope, now, stale_hours),
-        "sprints": {s: {**_summary(sprints[s], now, stale_hours),
+        "summary": {**_summary(scope, now, stale_hours, every), "refusals": refusal_stats(board, sprint)},
+        "sprints": {s: {**_summary(sprints[s], now, stale_hours, every),
                         "tokens": _tokens("".join(render.entry_md(t) for t in sprints[s]))}
                     for s in order if sprint is None or s == sprint},
         "roles": per_role,
@@ -156,6 +186,9 @@ def format_text(m: dict) -> str:
         f"Unanswered     {s['unanswered_open']} open Q/B with no answer",
         f"Stale          {s['stale_open']} open thread(s) idle >= {m['stale_hours']:g}h"
         + (f": {', '.join(s['stale_ids'][:10])}" + (" …" if len(s["stale_ids"]) > 10 else "") if s["stale_ids"] else ""),
+        f"Quiet C        {s['quiet_contracts']} open contract(s) not replied to or cited for >= {m['stale_hours']:g}h"
+        + (f": {_ids(s['quiet_contract_ids'])} (still live? supersede or close them)" if s["quiet_contract_ids"] else ""),
+        _refusal_line(s["refusals"]),
         "",
         "Sprint       threads  open  closed  answered  median 1st answer  median close  stale  ~tokens",
     ]
@@ -169,6 +202,21 @@ def format_text(m: dict) -> str:
                      f"{_short(x['hours_to_answer']):>13}  {x['waiting_on']:10}  {x['open_owned']:10}"
                      f"  {x['unread']} (~{x['unread_tokens']})")
     return "\n".join(lines)
+
+
+def _ids(ids: list[str]) -> str:
+    return ", ".join(ids[:10]) + (" …" if len(ids) > 10 else "")
+
+
+def _refusal_line(r: dict) -> str:
+    if not r["refused"] and not r["overridden"]:
+        return "Refused        0 writes (this checkout's local log)"
+    rules = ", ".join(f"{k} {v}" for k, v in sorted(r["by_rule"].items()))
+    line = f"Refused        {r['refused']} write(s)" + (f" ({rules})" if rules else "")
+    if r["handoffs_on_open_questions"]:
+        line += (f"; {r['resolved_by_answering']} of {r['handoffs_on_open_questions']} hand-offs refused on an "
+                 "open question were resolved by answering it")
+    return line + f"; {r['overridden']} forced with --force"
 
 
 def _short(stat: dict) -> str:

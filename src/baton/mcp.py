@@ -50,14 +50,17 @@ TOOLS = [
           "D decision, B blocker. Address roles by name.",
           {"role": _ROLE, "kind": {"type": "string", "enum": ["Q", "C", "D", "B"]},
            "to": {**_STRS, "description": "roles, or [\"all\"]"}, "title": {"type": "string"},
-           "body": {"type": "string"}, "files": _STRS, "cites": _STRS, "blocks": _STRS},
+           "body": {"type": "string"}, "files": _STRS, "cites": _STRS, "blocks": _STRS,
+           "supersedes": {**_IDS, "description": "with C: contracts this one replaces (they are closed)"}},
           ["kind", "to", "title", "body"]),
     _tool("baton_reply", "Answer a thread; close=true also closes it as settled.",
           {"role": _ROLE, "id": {"type": "string"}, "body": {"type": "string"},
            "close": {"type": "boolean"}}, ["id", "body"]),
     _tool("baton_close", "Close threads that are settled (answered, fixed or superseded). Orchestrators: "
-          "pass sprint to close every settled thread of a sprint (unanswered Q/B and live contracts stay open).",
-          {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"}, "sprint": {"type": "string"}}),
+          "pass sprint to close every settled thread of a sprint (unanswered Q/B and live contracts stay open), "
+          "or phase to close a phase's hand-offs once it passes its gate.",
+          {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"}, "sprint": {"type": "string"},
+           "phase": {"type": "string"}}),
     _tool("baton_handoff", "Hand off finished work (at most 20 lines) and update your status row. "
           "Refused while a question addressed to you is unanswered.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"},
@@ -83,7 +86,9 @@ TOOLS = [
           {"name": {"type": "string", "description": "the new sprint, e.g. S2"}}, ["name"]),
     _tool("baton_metrics", "Board health: answer and close times, stale threads, per-role load.",
           {"sprint": {"type": "string"}, "stale": {"type": "string"}}),
-    _tool("baton_lint", "Check the board: duplicate ids, unknown kinds, contracts without files, policies.", {}),
+    _tool("baton_lint", "Check the board: duplicate ids, unknown kinds, contracts without files, policies. "
+          "suggest=true proposes policies most entries already follow.",
+          {"all": {"type": "boolean", "description": "also check imported entries"}, "suggest": {"type": "boolean"}}),
 ]
 
 
@@ -121,7 +126,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
                 + (["--blocking"] if a.get("blocking") else []) + (["--stale", a["stale"]] if a.get("stale") else []))
     if name == "baton_post":
         out = ["post", a["kind"], *role, "--to", _csv(a["to"]), "--title", a["title"], "--body-file", body_file]
-        for key in ("files", "cites", "blocks"):
+        for key in ("files", "cites", "blocks", "supersedes"):
             if a.get(key):
                 out += [f"--{key}", _csv(a[key])]
         return out
@@ -129,6 +134,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
         return ["reply", a["id"], *role, "--body-file", body_file] + (["--close"] if a.get("close") else [])
     if name == "baton_close":
         return (["close", *(a.get("ids") or []), *role] + (["--sprint", a["sprint"]] if a.get("sprint") else [])
+                + (["--phase", a["phase"]] if a.get("phase") else [])
                 + (["--reason", a["reason"]] if a.get("reason") else []))
     if name == "baton_handoff":
         out = ["handoff", *role, "--phase", a["phase"], "--state", a["state"], "--to", _csv(a["to"]),
@@ -167,7 +173,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
                 out += [f"--{key}", a[key]]
         return out
     if name == "baton_lint":
-        return ["lint"]
+        return ["lint"] + (["--all"] if a.get("all") else []) + (["--suggest"] if a.get("suggest") else [])
     raise KeyError(name)
 
 
