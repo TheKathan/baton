@@ -24,6 +24,7 @@ Read at three moments only: (1) at start, (2) before you change a shared package
   baton reply Q-231 --as <role> -             answer a thread
   baton close Q-231 --as <role> [--reason ..] close a thread you settled
   baton handoff --as <role> --phase S6-B --state "DONE pending QA" --to qa --title "..." -
+      [--closes H-150]                        settle what this hand-off answers (e.g. the hand-offs you checked)
 
 Kinds: Q question · C contract change (needs --files) · D decision · H hand-off · B blocker.
 Blocking questions go straight to the orchestrator, not to the board.
@@ -110,7 +111,7 @@ def cmd_init(args) -> None:
     board.dir.mkdir(parents=True, exist_ok=True)
     gi = board.dir / ".gitignore"
     if not gi.exists():
-        gi.write_text(".lock\n.cursors/\n*.tmp\n")
+        gi.write_text(".lock\n.cursors/\n.local/\n*.tmp\n")
     print(f"initialised {path} (board dir {cfg['dir']}, sprint {cfg['sprint']})")
     try:
         render.render_all(board)
@@ -120,10 +121,24 @@ def cmd_init(args) -> None:
 
 def cmd_post(args) -> None:
     board = _board(args)
-    t = board.post(args.kind, _role(args), _csv(args.to), args.title, _body(args),
-                   _csv(args.files), _csv(args.cites), _csv(args.blocks))
+    role = _role(args)
+    # check --supersedes before writing anything, so a bad id never leaves a half-done change behind
+    old = [board.get(i) for i in _csv(args.supersedes)]
+    if old and args.kind.upper() != "C":
+        raise BoardError("--supersedes is for contract changes (C)")
+    for o in old:
+        if o["kind"] != "C":
+            raise BoardError(f"{o['id']} is not a contract (C); --supersedes replaces contracts only")
+        if o["status"] == "CLOSED":
+            raise BoardError(f"{o['id']} is already closed")
+    ids = [o["id"] for o in old]
+    t = board.post(args.kind, role, _csv(args.to), args.title, _body(args),
+                   _csv(args.files), _csv(args.cites) + [i for i in ids if i not in _csv(args.cites)],
+                   _csv(args.blocks), supersedes=ids)
+    for i in ids:
+        board.close(i, role, f"superseded by {t['id']}")
     _after_write(board)
-    print(f"posted {t['id']}")
+    print(f"posted {t['id']}" + (f"; closed {', '.join(ids)} as superseded" if ids else ""))
     for w in _long_body_warnings(board, t) + board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
 
@@ -145,11 +160,14 @@ def _unanswered(t: dict) -> bool:
 def cmd_close(args) -> None:
     board = _board(args)
     ids = list(args.ids)
+    if args.phase:  # a phase's hand-offs are settled once the phase has passed its gate
+        ids += [t["id"] for t in board.open_threads(kinds=["H"]) if t.get("phase") == args.phase
+                and t["id"] not in ids]
     if args.sprint:
         rows = [t for t in board.open_threads() if t["sprint"] == args.sprint]
         unanswered = [t for t in rows if _unanswered(t) and not args.include_unanswered]
         contracts = [t for t in rows if t["kind"] == "C" and not args.include_contracts]
-        ids += [t["id"] for t in rows if t not in unanswered and t not in contracts]
+        ids += [t["id"] for t in rows if t not in unanswered and t not in contracts and t["id"] not in ids]
         if unanswered:
             print("kept open (unanswered question/blocker; answer it, carry it over, or pass "
                   "--include-unanswered): " + ", ".join(t["id"] for t in unanswered))
@@ -157,10 +175,11 @@ def cmd_close(args) -> None:
             print("kept open (contracts stay live until a newer C- entry supersedes them; close them "
                   "by id then, or pass --include-contracts): " + ", ".join(t["id"] for t in contracts))
     if not ids:
-        if args.sprint:
+        if args.sprint or args.phase:
             print("nothing to close")
             return
-        raise BoardError("give entry ids, or --sprint <name> to close every settled open thread of a sprint")
+        raise BoardError("give entry ids, --phase <name> to close a phase's hand-offs, or --sprint <name> "
+                         "to close every settled open thread of a sprint")
     for i in ids:
         e = board.close(i, _role(args), args.reason or "")
         print(f"closed {e['id']}")
@@ -220,7 +239,7 @@ def cmd_open(args) -> None:
             limit = parse_duration(args.stale)
         except ValueError as e:
             raise BoardError(str(e)) from None
-        now = datetime.now()  # noqa: DTZ005 - board times are local wall-clock
+        now = datetime.now()
         rows = [t for t in rows if (age_hours(t, now) or 0) >= limit]
     for t in rows:
         print(render.one_line(t) + (f" · blocks {', '.join(t['blocks'])}" if t.get("blocks") else ""))
@@ -243,6 +262,9 @@ def cmd_handoff(args) -> None:
     waiting = board.awaiting(role)
     if waiting:
         problems.append("unanswered threads addressed to you: " + ", ".join(t["id"] for t in waiting))
+    if problems:
+        board.log_refusal("handoff", role, "H", args.title, problems, [t["id"] for t in waiting],
+                          forced=bool(args.force))
     if problems and not args.force:
         raise BoardError("hand-off refused:\n  - " + "\n  - ".join(problems) + "\n  (use --force with a reason in the body)")
     # resolve --closes before writing anything, so a bad id never leaves a half-done hand-off behind
@@ -250,7 +272,8 @@ def cmd_handoff(args) -> None:
     for i in _csv(args.closes):
         thread = board.get(i)
         (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
-    t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites))
+    t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites),
+                   phase=args.phase)
     for w in board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
@@ -261,6 +284,11 @@ def cmd_handoff(args) -> None:
           + (f"; closed {', '.join(to_close)}" if to_close else ""))
     if already:
         print(f"note: already closed, left as is: {', '.join(already)}")
+    received = [h for h in board.handoffs_to(role) if h["id"] not in to_close]
+    if received:
+        print("note: hand-offs to you are still open; if this hand-off settles them, close them "
+              f"(`baton close <id> --as {role}`, or `--closes` next time): "
+              + ", ".join(f"{h['id']} ({h['from']})" for h in received))
     candidates = board.maybe_settled(role)
     if candidates:
         print("note: you started these and someone has replied; close them if they are settled "
@@ -333,10 +361,17 @@ def cmd_grep(args) -> None:
 def cmd_lint(args) -> None:
     board = _board(args)
     threads = board.entries()
+    if args.suggest:
+        _lint_suggest(board, threads)
+        return
     errors, warnings = [], []
     nums = Counter(t["n"] for t in threads.values())
+    skipped = 0
     for t in threads.values():
         imported = t.get("imported")
+        if imported and not args.all:
+            skipped += 1  # old history: its problems were reported at import time
+            continue
         if nums[t["n"]] > 1:
             (warnings if imported else errors).append(f"{t['id']}: number {t['n']} is used by more than one entry")
         if t["kind"] not in board.cfg["kinds"]:
@@ -353,9 +388,27 @@ def cmd_lint(args) -> None:
         print(f"warn  {w}")
     for e in errors:
         print(f"error {e}")
-    print(f"{len(threads)} entries, {len(errors)} error(s), {len(warnings)} warning(s)")
+    print(f"{len(threads) - skipped} entries, {len(errors)} error(s), {len(warnings)} warning(s)"
+          + (f" ({skipped} imported entries skipped; --all checks them too)" if skipped else ""))
     if errors:
         sys.exit(1)
+
+
+def _lint_suggest(board: Board, threads: dict) -> None:
+    """Propose policies that the board's own recent entries already mostly follow."""
+    native = [t for t in threads.values() if not t.get("imported")]
+    found = policies.suggest(native, board.cfg.get("policies"))
+    if not found:
+        print(f"no suggestions from {len(native)} entries (a rule is suggested when at least "
+              f"{policies.SUGGEST_MIN} entries of a kind exist and most of them already follow it)")
+        return
+    print(f"Suggested policies, from {len(native)} entries (not imported). Each rule is already "
+          "followed by most entries of its kind:")
+    for rule, why in found:
+        print(f"  - {why}")
+    print('\nAdd the ones you want to .baton/config.json under "policies":\n')
+    rows = ",\n".join("  " + json.dumps(r) for r, _ in found)
+    print(f'"policies": [\n{rows}\n]')
 
 
 def cmd_brief(args) -> None:
@@ -386,6 +439,13 @@ def cmd_brief(args) -> None:
         out += [render.entry_md(t) for t in cited]
     if unknown:
         out.append(f"Not board entries (skipped): {', '.join(unknown)}\n")
+    received = board.handoffs_to(role)
+    if received:
+        out.append(f"## Hand-offs to you, still open ({len(received)}): close them once you've checked them\n")
+        out += [f"- {render.one_line(t)}" for t in received[:20]]
+        if len(received) > 20:
+            out.append(f"- … {len(received) - 20} more: `baton open --as {role} --kind H`")
+        out.append(f"\n(`baton close <id> --as {role}`, or `--closes <ids>` on your own hand-off)\n")
     candidates = board.maybe_settled(role)
     if candidates:
         out.append("## Yours, replied to: close if settled\n")
@@ -613,6 +673,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--files", help="comma-separated affected files (required for C)")
     sp.add_argument("--cites", help="comma-separated doc/story/decision ids")
     sp.add_argument("--blocks", help="comma-separated stories/tasks this blocks")
+    sp.add_argument("--supersedes", help="with C: comma-separated contracts this one replaces (they are closed)")
     body(sp)
 
     sp = add("reply", cmd_reply, "answer a thread", role=True)
@@ -628,6 +689,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="with --sprint, also close questions and blockers nobody answered")
     sp.add_argument("--include-contracts", action="store_true",
                     help="with --sprint, also close contract (C) entries")
+    sp.add_argument("--phase", help="close every open hand-off posted for this phase, e.g. once it passes QA")
     sp.add_argument("--reason")
 
     sp = add("show", cmd_show, "print entries by id, from any sprint")
@@ -681,7 +743,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("grep", cmd_grep, "search titles, bodies and replies")
     sp.add_argument("text", nargs="+")
 
-    add("lint", cmd_lint, "check ids, kinds, contracts and entry sizes")
+    sp = add("lint", cmd_lint, "check ids, kinds, contracts and entry sizes")
+    sp.add_argument("--all", action="store_true", help="also check imported entries (skipped by default)")
+    sp.add_argument("--suggest", action="store_true",
+                    help="propose policies that most of the board's entries already follow")
 
     sp = add("brief", cmd_brief, "one-call start-up pack: guide, status, waiting questions, cited entries",
              role=True)

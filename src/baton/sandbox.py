@@ -24,15 +24,32 @@ from .store import Board, BoardError, fold
 
 TASK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 LOCAL_PATHS = (f"/{config.SANDBOX_NAME}", f"/{config.BATON_DIR}/sandbox/")
+# Team settings a sandbox board takes from the project's committed .baton/config.json.
+INHERITED = ("policies", "kinds", "handoff_max_lines", "body_warn_lines", "unread_warn_tokens", "id_width")
 
 
 def task_file(root: Path, task: str) -> Path:
     return root / config.TASKS_DIR / f"{task}.jsonl"
 
 
-def sandbox_config(task: str, roles: list[str]) -> dict:
+def project_settings(root: Path) -> dict:
+    """The team settings of the project's own board (policies, kinds, roles, limits), if it has one."""
+    try:
+        raw = json.loads((root / config.CONFIG_NAME).read_text())
+    except (OSError, ValueError):
+        return {}
+    out = {k: raw[k] for k in INHERITED if k in raw}
+    if raw.get("roles"):
+        out["roles"] = raw["roles"]
+    return out
+
+
+def sandbox_config(task: str, roles: list[str], inherited: dict | None = None) -> dict:
     base = f"{config.BATON_DIR}/sandbox"
-    return {**config.DEFAULTS, "sandbox": True, "task": task, "sprint": task, "roles": roles,
+    inherited = dict(inherited or {})
+    roles = roles or inherited.pop("roles", [])
+    inherited.pop("roles", None)
+    return {**config.DEFAULTS, **inherited, "sandbox": True, "task": task, "sprint": task, "roles": roles,
             "dir": f"{base}/events", "board_md": f"{base}/BOARD.md", "status_md": f"{base}/STATUS.md",
             "contracts_index": f"{base}/CONTRACTS-INDEX.md", "archive_dir": f"{base}/archive",
             "auto_render": False, "shared_worktrees": False, "format": 1}
@@ -63,9 +80,10 @@ def init(root: Path, task: str, roles: list[str], force: bool = False) -> str:
     if (root / config.SANDBOX_NAME).exists() and not force:
         raise BoardError(f"{config.SANDBOX_NAME} exists (this checkout already has a sandbox board; "
                          "use --force to start over)")
-    cfg = sandbox_config(task, roles)
+    inherited = project_settings(root)
+    cfg = sandbox_config(task, roles, inherited)
+    board = Board(root, cfg)  # validates inherited policies before anything is written
     config.save(root, cfg)
-    board = Board(root, cfg)
     board.dir.mkdir(parents=True, exist_ok=True)
     excluded = _exclude_locally(root)
     resumed = 0
@@ -80,6 +98,9 @@ def init(root: Path, task: str, roles: list[str], force: bool = False) -> str:
         for role in roles_seen:  # the history was read by the previous sandbox: start at the tip
             board.unread(role)
     note = f"resumed {resumed} event(s) from {exported.relative_to(root)}" if resumed else "new task board"
+    taken = [k for k in ("policies", "kinds") if k in inherited] + (["roles"] if inherited.get("roles") and not roles else [])
+    if taken:
+        note += f"; {', '.join(taken)} from {config.CONFIG_NAME}"
     if not excluded:
         note += "; not a git checkout, so add .baton/sandbox* to your ignores yourself"
     return f"sandbox board for {task}: {note}"
@@ -152,5 +173,11 @@ def summary(board: Board) -> str:
             parts += [f"**{title}**", *rows, ""]
     if len(parts) == 2:
         parts += ["_No entries._", ""]
+    refused = [r for r in board.refusals() if not r.get("forced")]
+    forced = [r for r in board.refusals() if r.get("forced")]
+    if refused or forced:
+        parts += [f"_baton refused {len(refused)} write(s) in this sandbox"
+                  + (f" ({sum(r['what'] == 'handoff' for r in refused)} hand-offs)" if refused else "")
+                  + (f"; {len(forced)} forced with --force_" if forced else "_"), ""]
     parts.append(f"_Full board: `{config.TASKS_DIR}/{task}.jsonl` · {len(threads)} thread(s)_")
     return "\n".join(parts)

@@ -6,10 +6,14 @@ under that same lock, so concurrent agents can never allocate the same id.
 
 Event types:
   entry  {id, kind, n, from, to[], title, body, files[], cites[], blocks[]}
+         (optional: phase on hand-offs, supersedes[] on contracts)
   reply  {id, from, body}
   close  {id, from, reason}
 Every event also carries {v, type, ev, sprint, ts}. The format is documented in
 docs/FORMAT.md; see schema.py for versioning.
+
+Refused writes are recorded in `<dir>/.local/refusals.jsonl`, a git-ignored local log that
+is not part of the board: the board itself only ever holds what was written.
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ from . import policies
 from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
 
 ALL = "all"
+LOCAL_DIR = ".local"  # per-checkout data under the board dir, never committed
 
 
 class BoardError(Exception):
@@ -156,8 +161,48 @@ class Board:
         if roles and role not in roles:
             raise BoardError(f"unknown role {role!r}; known: {', '.join(roles)}")
 
+    # ---------- refusals (local log, not part of the board) ----------
+    def refusals_path(self) -> Path:
+        return self.dir / LOCAL_DIR / "refusals.jsonl"
+
+    def log_refusal(self, what: str, role: str, kind: str, title: str, reasons: list[str],
+                    waiting: list[str] = (), forced: bool = False) -> None:
+        """Record a refused write (or one forced past the rules). Best effort: never fails a command."""
+        row = {"at": utc_now(), "ts": now(), "sprint": self.cfg["sprint"], "what": what, "role": role,
+               "kind": kind, "title": title, "reasons": list(reasons), "waiting": list(waiting),
+               "forced": forced}
+        try:
+            with self.lock():
+                self._ignore_local()
+                path = self.refusals_path()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("a") as f:
+                    f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
+    def _ignore_local(self) -> None:
+        gi = self.dir / ".gitignore"
+        lines = gi.read_text().splitlines() if gi.exists() else []
+        if f"{LOCAL_DIR}/" not in lines:
+            with gi.open("a") as f:
+                f.write(("\n" if lines and not gi.read_text().endswith("\n") else "") + f"{LOCAL_DIR}/\n")
+
+    def refusals(self) -> list[dict]:
+        path = self.refusals_path()
+        if not path.exists():
+            return []
+        out = []
+        for line in path.read_text().splitlines():
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # a damaged local line never breaks a command
+        return out
+
     def post(self, kind: str, author: str, to: list[str], title: str, body: str,
-             files: list[str] = (), cites: list[str] = (), blocks: list[str] = ()) -> dict:
+             files: list[str] = (), cites: list[str] = (), blocks: list[str] = (),
+             phase: str = "", supersedes: list[str] = ()) -> dict:
         kind = kind.upper()
         if kind not in self.cfg["kinds"]:
             raise BoardError(f"unknown kind {kind!r}; known: {', '.join(self.cfg['kinds'])}")
@@ -168,12 +213,18 @@ class Board:
         if not title.strip():
             raise BoardError("--title is required")
         if kind == "C" and not files:
+            self.log_refusal("contract", author, kind, title, ["a contract change (C) must list the affected --files"])
             raise BoardError("a contract change (C) must list the affected --files")
         entry = {"type": "entry", "kind": kind, "from": author, "to": list(to) or [ALL],
                  "title": title.strip(), "body": body.strip(), "files": list(files),
                  "cites": list(cites), "blocks": list(blocks)}
+        if phase:
+            entry["phase"] = phase
+        if supersedes:
+            entry["supersedes"] = list(supersedes)
         refusals, self.last_warnings = policies.check(self.cfg.get("policies"), entry)
         if refusals:
+            self.log_refusal("policy", author, kind, title, refusals)
             raise BoardError("refused by the project's policies (.baton/config.json):\n  - "
                              + "\n  - ".join(refusals))
         with self.lock():
@@ -253,6 +304,11 @@ class Board:
         """Open threads the role started that someone else has since replied to: probably settled."""
         return [t for t in self.open_threads(role) if t["from"] == role
                 and t["kind"] in ("Q", "B") and any(r["from"] != role for r in t["replies"])]
+
+    def handoffs_to(self, role: str) -> list[dict]:
+        """Open hand-offs addressed to the role by name, from someone else."""
+        return [t for t in self.open_threads(role, ["H"], named_only=True)
+                if role in t["to"] and t["from"] != role]
 
     def awaiting(self, role: str) -> list[dict]:
         """Open Q/B threads addressed to the role (by name) that the role has not answered."""

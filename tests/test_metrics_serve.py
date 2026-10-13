@@ -43,7 +43,7 @@ class Base(unittest.TestCase):
         b.append_raw({"type": "close", "id": q1, "from": "frontend", "reason": "", "ts": "2026-10-01 14:00"})
         entry("Q", "qa", ["frontend"], "badge <script>alert(1)</script>?", "2026-10-02 09:00")
         entry("B", "qa", ["backend"], "500 on runs", "2026-10-05 08:00")
-        self.now = datetime(2026, 10, 5, 10, 0)  # noqa: DTZ001 - board times are naive local
+        self.now = datetime(2026, 10, 5, 10, 0)
 
     def tearDown(self):
         os.environ.pop("BATON_ROOT", None)

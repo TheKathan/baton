@@ -41,7 +41,7 @@ EOF
 - **Address roles by name** (`--to backend,qa`). `open` lists only threads that name a role, so a question sent to `all` doesn't reach the person who should answer it.
 - **State an interim choice** whenever you ask something, so nobody sits idle waiting for an answer.
 - **Cite ids instead of restating** ("per C-001 §2"), keep one topic per entry, and keep bodies short. Every reader pays for every line, so link long tables and logs from a file.
-- **When a contract changes**, post a new `C` that cites the old one, then close the old one with `--reason "superseded by C-…"`. Otherwise two "live" shapes remain.
+- **When a contract changes**, post the new `C` with `--supersedes C-…`: baton cites the old one and closes it, so only one shape stays live.
 - **Never post secrets.** Say where a secret is kept, never its value.
 
 ## Closing: the habit that keeps the board useful
@@ -49,6 +49,7 @@ An open thread means someone still owes something. Close a thread when it become
 - **Close your own threads** once they're settled, for example a blocker someone fixed. Nobody else will. If you can't re-check a fix yourself, close it on the fixer's word and put "not re-verified" in `--reason`.
 - **After answering a question addressed to you,** close it with `reply … --close` if your answer settles it.
 - **Don't close someone else's unanswered question or blocker.** That deletes their reminder without giving them an answer.
+- **Hand-offs to you are yours to close** once you've checked the work (QA: at your gate). Pass them in `--closes` on your own hand-off. `baton brief` lists the ones still open.
 
 ## Handing off
 ```bash
@@ -71,12 +72,14 @@ EOF
 - **Set up** a project with `baton init --sprint S1 --roles orchestrator,backend,frontend,qa`. Commit `.baton/config.json` and `.baton/events/`.
 - **Brief each agent** with its role, the exact entry ids to read, and "start with `baton brief`".
 - **Track the work** with `baton open --blocking`, `baton open`, `baton status` and `baton lint`. Record rulings as `D` entries or as replies.
+- **Close a phase** after its gate passes: `baton close --phase S6-A --as orchestrator --reason "S6-A passed QA"` closes that phase's hand-offs.
 - **Close a sprint** after its gate passes:
   1. Read `baton open`.
   2. Close what's settled. `baton close --sprint S6 --as orchestrator --reason "…"` keeps unanswered questions and blockers, and live contracts, open. Don't add `--include-*` at a normal close; those flags are for importing old history.
   3. Run `baton sprint S7`.
   4. Tell the owner what carried over, especially unanswered questions and who owes them.
-- **Watch health and cost** with `baton metrics` (answer and close times, stale threads, who is waiting), `baton open --stale 2d` and `baton stats`. For humans: `baton serve` (a read-only dashboard).
+- **Watch health and cost** with `baton metrics` (answer and close times, stale threads, quiet contracts, refused hand-offs, who is waiting), `baton open --stale 2d` and `baton stats`. For humans: `baton serve` (a read-only dashboard).
+- **Turn habits into rules** with `baton lint --suggest`, which proposes policies most entries already follow. The owner decides which to add.
 - **Migrate an old Markdown board** with `baton import` (see `baton import --help`).
 
 `baton <command> --help` lists every flag.
