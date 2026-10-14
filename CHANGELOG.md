@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-14
+
 ### Changed
 - The sandbox guide's *Use it in a pipeline* section is now [*Use it in a workflow*](docs/sandbox.md#use-it-in-a-workflow). It starts with the GitHub Actions ([setup-baton](https://github.com/TheKathan/setup-baton), [baton-task](https://github.com/TheKathan/baton-task) and [baton-check](https://github.com/TheKathan/baton-check)), followed by the plain script and `baton report` for any other CI. The README links to the actions.
 
