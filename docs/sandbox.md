@@ -80,7 +80,7 @@ git add .baton/tasks/LIN-123.jsonl
 git commit -m "LIN-123: agent board"
 ```
 
-Put the summary in the PR description or a comment, using whatever your tooling provides. See [Use it in a pipeline](#use-it-in-a-pipeline).
+Put the summary in the PR description or a comment, using whatever your tooling provides. See [Use it in a workflow](#use-it-in-a-workflow).
 
 ## What goes in the PR and what stays local
 
@@ -160,9 +160,49 @@ $ baton finish --strict --summary pr.md >/dev/null; echo $?
 0
 ```
 
-## Use it in a pipeline
+## Use it in a workflow
 
-A trigger or CI job runs four steps around the agent: start the board, run the agent, `finish --strict`, then stage the board file. The script below is plain git and baton. It does not call any hosting, tracker or chat API: commit, push and report the way your own tooling does.
+A CI workflow runs four steps around the agent: start the board, run the agent, export the board with `finish`, and stage the task file. A second workflow, on the pull request, reports on the exported board and blocks the merge while a question is still open.
+
+### With GitHub Actions
+
+Three actions run these steps with the `baton` command, so the board and the rules are the same as in a local run.
+
+| Action | What it does |
+|---|---|
+| [`TheKathan/setup-baton`](https://github.com/TheKathan/setup-baton) | Installs baton (default `v1`, the latest 1.x) and puts `baton` on the PATH. |
+| [`TheKathan/baton-task`](https://github.com/TheKathan/baton-task) | `mode: start` before the agent creates or resumes the task's board. `mode: finish` after it exports the board, stages the task file and writes the summary to the job summary. With `strict: true` the step fails while a question is open. |
+| [`TheKathan/baton-check`](https://github.com/TheKathan/baton-check) | On a pull request, reports the task boards changed since the PR's base in the job summary and, by default, fails while one has open questions or blockers. |
+
+In the sandbox job, around the agent:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: TheKathan/baton-task@v1
+  with: { mode: start, task: LIN-123 }
+- run: ./run-my-agent.sh            # any agent; it uses the baton command
+- uses: TheKathan/baton-task@v1
+  with: { mode: finish, task: LIN-123, strict: true }
+```
+
+On the pull request:
+
+```yaml
+on: pull_request
+jobs:
+  baton:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: TheKathan/baton-check@v1
+```
+
+The actions run on Linux and macOS runners. Each is versioned on its own: `@v1` is its latest 1.x release. If a job opens the PR, use a GitHub App token or a personal access token, because PRs created with the default `GITHUB_TOKEN` don't trigger `baton-check`.
+
+### With any other CI
+
+The script below does the same as `baton-task` with plain git and baton. It does not call any hosting, tracker or chat API: commit, push and report the way your own tooling does.
 
 ```sh
 #!/bin/sh
@@ -200,9 +240,15 @@ How it behaves:
 
 Decide for yourself what a failing `--strict` means: fail the job, comment on the task, or rerun the agent with the open question in its brief. Drop `--strict` if open questions should not block the PR; `finish` then prints a note and exits 0.
 
-## Check it on the pull request
+How it behaves:
 
-The exported file travels with the PR, so a check that runs on the pull request can report on it. The live sandbox board is gone by then, and the check doesn't need it: `baton report` reads the committed task files directly.
+- With an agent that hands off and leaves nothing open, it exits 0, stages `.baton/tasks/LIN-7.jsonl` and leaves the summary in `$TMPDIR`.
+- With an agent that leaves a question open, it prints `baton: 1 question(s)/blocker(s) still open: Q-001` and exits 1 without staging. The exported file is already on disk but untracked, so a later step can still read it.
+- The agent's own changes are not staged. Add them with your own `git add` before you commit.
+
+Decide for yourself what a failing `--strict` means: fail the job, comment on the task, or rerun the agent with the open question in its brief. Drop `--strict` if open questions should not block the PR; `finish` then prints a note and exits 0.
+
+For the pull request, run `baton report`, which is what `baton-check` runs:
 
 ```sh
 # In the PR's checkout, with the base branch fetched:
