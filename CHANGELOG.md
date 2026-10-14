@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- **The README is a short pitch**: why to use baton, what it's for, how it works in one paragraph, and a three-line install. The evidence, comparison and FAQ moved to [docs/why-baton.md](docs/why-baton.md), and the file layout, install options, stability promise and limits to [docs/how-it-works.md](docs/how-it-works.md).
+
 ## [1.3.0] - 2026-10-13
 
 ### Added
