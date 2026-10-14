@@ -609,6 +609,49 @@ def cmd_finish(args) -> None:
         print(f"note: {msg}", file=sys.stderr)
 
 
+def cmd_report(args) -> None:
+    """Report on exported task boards (.baton/tasks/<task>.jsonl), e.g. in a PR check. Needs no board."""
+    from . import sandbox
+    from .store import fold
+    if args.since:
+        root = Path(args.root).resolve() if args.root else Path.cwd()
+        paths = sandbox.changed_exports(root, args.since)
+    else:
+        paths = [Path(f) for f in args.files]
+    if not paths:
+        msg = (f"no task boards changed since {args.since}" if args.since
+               else "give exported task files, or --since <git ref> to find the changed ones")
+        if not args.since:
+            raise BoardError(msg)
+        print(msg)
+        return
+    reports, problems = [], []
+    for p in paths:
+        if not p.exists():
+            raise BoardError(f"{p}: no such file")
+        threads = fold(sandbox.read_export(p))
+        asks = sandbox.open_asks(threads)
+        reports.append({"task": p.stem, "file": str(p), "threads": len(threads),
+                        "open_asks": [t["id"] for t in asks],
+                        "summary": sandbox.summary_text(p.stem, threads)})
+        if asks:
+            problems.append(f"{p.stem}: {len(asks)} question(s)/blocker(s) still open: "
+                            + ", ".join(t["id"] for t in asks))
+    if args.json:
+        print(json.dumps(reports, indent=2))
+    else:
+        text = "\n\n".join(r["summary"] for r in reports)
+        if args.summary:
+            Path(args.summary).write_text(text + "\n")
+            print(f"wrote the report for {len(reports)} task(s) to {args.summary}")
+        else:
+            print(text)
+    for msg in problems:
+        print(f"note: {msg}", file=sys.stderr)
+    if problems and args.strict:
+        raise BoardError(f"{len(problems)} task board(s) with open questions or blockers")
+
+
 def cmd_contracts(args) -> None:
     """Live contracts from other tasks' exported boards on this branch (and this board's own)."""
     from . import sandbox
@@ -781,6 +824,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("finish", cmd_finish, "sandbox boards: export the board to .baton/tasks/<task>.jsonl for the PR")
     sp.add_argument("--summary", metavar="FILE", help="write the Markdown PR summary to FILE instead of printing it")
     sp.add_argument("--strict", action="store_true", help="exit 1 while questions or blockers are still open")
+
+    sp = add("report", cmd_report, "report on exported task boards (.baton/tasks/*.jsonl), e.g. in a PR check")
+    sp.add_argument("files", nargs="*", help="exported task files, e.g. .baton/tasks/LIN-123.jsonl")
+    sp.add_argument("--since", metavar="REF", help="report every task file added or changed since this git ref, "
+                                                   "e.g. origin/main")
+    sp.add_argument("--root", help="with --since: the repository (default: the current directory)")
+    sp.add_argument("--strict", action="store_true", help="exit 1 while any task has open questions or blockers")
+    sp.add_argument("--summary", metavar="FILE", help="write the Markdown report to FILE instead of printing it")
+    sp.add_argument("--json", action="store_true", help="machine-readable output")
 
     sp = add("contracts", cmd_contracts, "live contracts: this board's and other tasks' exported boards")
     sp.add_argument("--paths", help="only contracts touching these globs, e.g. 'modules/network/**'")

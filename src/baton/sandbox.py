@@ -146,14 +146,49 @@ def finish(board: Board) -> tuple[Path, dict]:
     tmp.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in events))
     tmp.replace(path)
     threads = board.entries()
-    open_asks = [t for t in threads.values() if t["status"] == "OPEN" and t["kind"] in ("Q", "B")]
-    return path, {"events": len(events), "threads": len(threads), "open_asks": open_asks}
+    return path, {"events": len(events), "threads": len(threads), "open_asks": open_asks(threads)}
+
+
+def read_export(path: Path) -> list[dict]:
+    """The events of an exported task board, in order. Raises BoardError on a damaged line."""
+    from .schema import FormatError, upgrade
+    events = []
+    for i, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            events.append(upgrade(json.loads(line), f"{path.name}:{i}"))
+        except (json.JSONDecodeError, FormatError) as e:
+            raise BoardError(f"{path}:{i}: not a baton event ({e})") from None
+    events.sort(key=lambda e: e.get("ev", 0))
+    return events
+
+
+def changed_exports(root: Path, since: str) -> list[Path]:
+    """Exported task boards added or changed since the git ref `since` (e.g. the PR's base)."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "diff", "--name-only", "--diff-filter=AM", f"{since}...HEAD",
+                            "--", f"{config.TASKS_DIR}/*.jsonl"], capture_output=True, text=True, timeout=30,
+                           check=False)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise BoardError(f"git diff against {since} failed: {e}") from None
+    if r.returncode != 0:
+        raise BoardError(f"git diff against {since} failed: {r.stderr.strip() or 'unknown ref?'} "
+                         "(in CI, fetch the base branch, e.g. actions/checkout with fetch-depth: 0)")
+    return [root / p for p in r.stdout.split()]
+
+
+def open_asks(threads: dict) -> list[dict]:
+    return [t for t in threads.values() if t["status"] == "OPEN" and t["kind"] in ("Q", "B")]
 
 
 def summary(board: Board) -> str:
     """A Markdown summary for the PR comment: decisions, contracts, hand-offs, open asks."""
-    task = board.cfg["task"]
-    threads = list(board.entries().values())
+    return summary_text(board.cfg["task"], board.entries(), board.refusals())
+
+
+def summary_text(task: str, by_id: dict, refusals: list[dict] = ()) -> str:
+    threads = list(by_id.values())
 
     def lines(kinds, only_open=False):
         out = []
@@ -173,8 +208,8 @@ def summary(board: Board) -> str:
             parts += [f"**{title}**", *rows, ""]
     if len(parts) == 2:
         parts += ["_No entries._", ""]
-    refused = [r for r in board.refusals() if not r.get("forced")]
-    forced = [r for r in board.refusals() if r.get("forced")]
+    refused = [r for r in refusals if not r.get("forced")]
+    forced = [r for r in refusals if r.get("forced")]
     if refused or forced:
         parts += [f"_baton refused {len(refused)} write(s) in this sandbox"
                   + (f" ({sum(r['what'] == 'handoff' for r in refused)} hand-offs)" if refused else "")

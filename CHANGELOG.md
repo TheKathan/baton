@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **`baton report`** reports on exported task boards without needing a board: the same Markdown summary as `finish`, for one or more `.baton/tasks/*.jsonl` files, or for every task file changed since a git ref with `--since origin/main`. `--strict` exits 1 while a task has open questions or blockers, so a pull-request check can keep the PR from merging. `--summary FILE` and `--json` are supported.
+
 ## [1.3.1] - 2026-10-14
 
 ### Changed
