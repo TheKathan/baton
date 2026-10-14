@@ -21,7 +21,7 @@ A breaking change would create format 2, together with a read-time upgrade from 
 .baton/*.md, .baton/archive/*.md generated views; never parsed back
 ```
 
-Inside a linked git worktree, baton uses the main worktree's `.baton/` (see the README).
+Inside a linked git worktree, baton uses the main worktree's `.baton/` (see [How it works](how-it-works.md#worktrees-and-sandboxes)).
 
 ## Sandbox boards
 
@@ -48,7 +48,7 @@ A JSON object. Missing keys take these defaults:
 | `id_width` | integer | `3` |
 | `auto_render` | boolean | `true` |
 | `shared_worktrees` | boolean | `true` |
-| `policies` | array of rule objects (see the README) | `[]` |
+| `policies` | array of rule objects (see [Policies](policies.md)) | `[]` |
 
 ## Events
 
