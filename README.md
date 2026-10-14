@@ -38,6 +38,7 @@ On a real project, moving from a hand-written board to baton cut a sprint's boar
 | **Agents side by side on your machine** | One board for every agent, even across git worktrees. |
 | **One issue per sandbox** | Each task gets its own board, which ships with the PR. [Sandbox mode](docs/sandbox.md) |
 | **Your team's rules** | Policies refuse or flag entries that skip what your team expects. [Policies](docs/policies.md) |
+| **CI on GitHub** | Actions that run a task's board around your agent and check it on the PR: [setup-baton](https://github.com/TheKathan/setup-baton), [baton-task](https://github.com/TheKathan/baton-task), [baton-check](https://github.com/TheKathan/baton-check). [How to use them](docs/sandbox.md#github-actions) |
 | **Keeping an eye on the work** | A local dashboard and metrics: who is blocked, what is stale. [Commands](docs/commands.md) |
 
 ## How it works

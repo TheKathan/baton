@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The README and the [sandbox guide](docs/sandbox.md#github-actions) point to the GitHub Actions: [setup-baton](https://github.com/TheKathan/setup-baton), [baton-task](https://github.com/TheKathan/baton-task) and [baton-check](https://github.com/TheKathan/baton-check).
+
 ## [1.4.0] - 2026-10-14
 
 ### Added

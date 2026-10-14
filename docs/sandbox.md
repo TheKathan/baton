@@ -218,6 +218,42 @@ Some hosts don't run checks for a PR that a job opened with the job's own token,
 
 To tell agents their role and the rules, run `baton skill install --project` once in the repository (it writes `.claude/skills/`, which you commit) or paste `baton guide` into the agent's brief.
 
+## GitHub Actions
+
+On GitHub, three actions wrap the steps above. Each one runs the same `baton` commands, so the board and the rules are identical to a local run.
+
+| Action | What it does |
+|---|---|
+| [`TheKathan/setup-baton`](https://github.com/TheKathan/setup-baton) | Installs baton (default `v1`, the latest 1.x) and puts `baton` on the PATH. |
+| [`TheKathan/baton-task`](https://github.com/TheKathan/baton-task) | `mode: start` before the agent creates or resumes the task's board. `mode: finish` after it exports the board, stages the task file and writes the summary to the job summary. With `strict: true` the step fails while a question is open. |
+| [`TheKathan/baton-check`](https://github.com/TheKathan/baton-check) | On a pull request, reports the task boards changed since the PR's base in the job summary and, by default, fails while one has open questions or blockers. |
+
+Around an agent, in the sandbox job:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: TheKathan/baton-task@v1
+  with: { mode: start, task: LIN-123 }
+- run: ./run-my-agent.sh            # any agent; it uses the baton command
+- uses: TheKathan/baton-task@v1
+  with: { mode: finish, task: LIN-123, strict: true }
+```
+
+On the pull request:
+
+```yaml
+on: pull_request
+jobs:
+  baton:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: TheKathan/baton-check@v1
+```
+
+The actions run on Linux and macOS runners. Each is versioned on its own: `@v1` is its latest 1.x release. If a job opens the PR, use a GitHub App token or a personal access token, because PRs created with the default `GITHUB_TOKEN` don't trigger `baton-check`.
+
 ## Use it through MCP
 
 The `baton` command is preferred. It has every option and works in any shell. Use MCP only for an agent that cannot run shell commands. Register the server once with `baton mcp install`, then the agent has:
