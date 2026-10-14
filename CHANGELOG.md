@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The README and the [sandbox guide](docs/sandbox.md#with-github-actions) link to the actions' GitHub Marketplace pages: [Setup baton CLI](https://github.com/marketplace/actions/setup-baton-cli), [baton task board](https://github.com/marketplace/actions/baton-task-board) and [baton PR check](https://github.com/marketplace/actions/baton-pr-check).
+
 ## [1.4.1] - 2026-10-14
 
 ### Changed

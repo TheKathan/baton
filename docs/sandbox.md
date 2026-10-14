@@ -170,9 +170,9 @@ Three actions run these steps with the `baton` command, so the board and the rul
 
 | Action | What it does |
 |---|---|
-| [`TheKathan/setup-baton`](https://github.com/TheKathan/setup-baton) | Installs baton (default `v1`, the latest 1.x) and puts `baton` on the PATH. |
-| [`TheKathan/baton-task`](https://github.com/TheKathan/baton-task) | `mode: start` before the agent creates or resumes the task's board. `mode: finish` after it exports the board, stages the task file and writes the summary to the job summary. With `strict: true` the step fails while a question is open. |
-| [`TheKathan/baton-check`](https://github.com/TheKathan/baton-check) | On a pull request, reports the task boards changed since the PR's base in the job summary and, by default, fails while one has open questions or blockers. |
+| [`TheKathan/setup-baton`](https://github.com/TheKathan/setup-baton) ([Marketplace](https://github.com/marketplace/actions/setup-baton-cli)) | Installs baton (default `v1`, the latest 1.x) and puts `baton` on the PATH. |
+| [`TheKathan/baton-task`](https://github.com/TheKathan/baton-task) ([Marketplace](https://github.com/marketplace/actions/baton-task-board)) | `mode: start` before the agent creates or resumes the task's board. `mode: finish` after it exports the board, stages the task file and writes the summary to the job summary. With `strict: true` the step fails while a question is open. |
+| [`TheKathan/baton-check`](https://github.com/TheKathan/baton-check) ([Marketplace](https://github.com/marketplace/actions/baton-pr-check)) | On a pull request, reports the task boards changed since the PR's base in the job summary and, by default, fails while one has open questions or blockers. |
 
 In the sandbox job, around the agent:
 
