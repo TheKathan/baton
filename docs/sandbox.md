@@ -200,6 +200,22 @@ How it behaves:
 
 Decide for yourself what a failing `--strict` means: fail the job, comment on the task, or rerun the agent with the open question in its brief. Drop `--strict` if open questions should not block the PR; `finish` then prints a note and exits 0.
 
+## Check it on the pull request
+
+The exported file travels with the PR, so a check that runs on the pull request can report on it. The live sandbox board is gone by then, and the check doesn't need it: `baton report` reads the committed task files directly.
+
+```sh
+# In the PR's checkout, with the base branch fetched:
+baton report --since origin/main --strict --summary report.md
+```
+
+- It finds every `.baton/tasks/*.jsonl` added or changed since the base, and writes one summary per task to `report.md` for your check's output or a PR comment.
+- `--strict` exits 1 while a question or blocker is open, so a required check keeps the PR from merging until it is settled.
+- A PR without a task file passes with `no task boards changed since origin/main`.
+- The refusal counts in the sandbox's own `finish` summary come from a local log that is not exported, so the report doesn't show them.
+
+Some hosts don't run checks for a PR that a job opened with the job's own token, to prevent loops. If the sandbox opens the PR, give it a token that does trigger checks.
+
 To tell agents their role and the rules, run `baton skill install --project` once in the repository (it writes `.claude/skills/`, which you commit) or paste `baton guide` into the agent's brief.
 
 ## Use it through MCP

@@ -231,6 +231,23 @@ Exports the board to `.baton/tasks/<task>.jsonl` and prints a Markdown summary f
 baton finish --strict --summary pr.md
 ```
 
+### `baton report`
+
+Reports on exported task boards (`.baton/tasks/<task>.jsonl`): the same Markdown summary as `finish`, one section per task. It needs no board and writes nothing to `.baton/`, so it suits a check that runs on the pull request. See [Check it on the pull request](sandbox.md#check-it-on-the-pull-request).
+
+| Flag | Meaning |
+|---|---|
+| `FILES` | Exported task files to report on. |
+| `--since REF` | Instead of files, report every task file added or changed since this git ref, for example `origin/main`. Nothing changed prints a note and exits 0. |
+| `--root DIR` | With `--since`: the repository. Default: the current directory. |
+| `--strict` | Exit 1 while any task has open questions or blockers. |
+| `--summary FILE` | Write the report to `FILE` instead of printing it. |
+| `--json` | Machine-readable output: task, file, thread count, open question and blocker ids, summary. |
+
+```bash
+baton report --since origin/main --strict --summary report.md
+```
+
 ## Orchestrator
 
 ### `baton sprint`
@@ -405,4 +422,4 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 
 `baton_post` offers the entry kinds from your config, without `H`. Tools return the command's output as text, with `isError` set when the command failed.
 
-There is no MCP tool for `init` (without `--sandbox`), `render`, `import`, `skill`, `migrate`, `stats`, `serve` or `where`. Run those with the command.
+There is no MCP tool for `init` (without `--sandbox`), `render`, `import`, `skill`, `migrate`, `stats`, `serve`, `report` or `where`. Run those with the command.
