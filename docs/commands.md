@@ -233,7 +233,7 @@ baton finish --strict --summary pr.md
 
 ### `baton report`
 
-Reports on exported task boards (`.baton/tasks/<task>.jsonl`): the same Markdown summary as `finish`, one section per task. It needs no board and writes nothing to `.baton/`, so it suits a check that runs on the pull request. See [Check it on the pull request](sandbox.md#check-it-on-the-pull-request).
+Reports on exported task boards (`.baton/tasks/<task>.jsonl`): the same Markdown summary as `finish`, one section per task. It needs no board and writes nothing to `.baton/`, so it suits a check that runs on the pull request. See [Use it in a workflow](sandbox.md#use-it-in-a-workflow).
 
 | Flag | Meaning |
 |---|---|
