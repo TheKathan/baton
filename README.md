@@ -27,16 +27,7 @@ baton reply Q-001 --as backend --close "Use GET /api/health."
 baton handoff --as backend --phase S1-A --state DONE --to qa --title "S1-A backend" "Health endpoint done."
 ```
 
-The first hand-off is refused, and nothing is written:
-
-```text
-baton: hand-off refused:
-  - unanswered threads addressed to you: Q-001
-  answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"
-  (or hand off anyway with --force and the reason in the body)
-```
-
-After the reply, the same hand-off goes through as `H-002`. Or just run `baton demo`, which replays the refusal in a temporary board.
+The first hand-off is refused (`answer first: baton show Q-001, then baton reply …`) and nothing is written; after the reply it goes through as `H-002`. Or just run `baton demo` for a narrated replay on a temporary board.
 
 ## Why baton
 
