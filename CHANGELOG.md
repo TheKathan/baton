@@ -11,6 +11,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Added
 - A code of conduct (Contributor Covenant 2.0), issue templates for bugs and feature requests, and a pull request template.
 
+### Removed
+- `scripts/enable-public-security.sh`, a one-time setup script that is no longer needed.
+
 ## [1.4.3] - 2026-10-14
 
 ## [1.4.2] - 2026-10-14
