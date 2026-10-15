@@ -2,7 +2,6 @@
   "name": "agent-baton",
   "version": "1.4.4",
   "description": "A file-based, append-only coordination board for AI agents building software together",
-  "private": true,
   "license": "MIT",
   "homepage": "https://github.com/TheKathan/baton#readme",
   "bugs": {
@@ -14,7 +13,8 @@
     "url": "git+https://github.com/TheKathan/baton.git"
   },
   "bin": {
-    "baton": "bin/baton"
+    "baton": "bin/baton",
+    "agent-baton": "bin/baton"
   },
   "files": [
     "bin/",
@@ -40,5 +40,9 @@
     "multi-agent",
     "cli",
     "claude-code"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

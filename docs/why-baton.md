@@ -38,14 +38,28 @@ Task trackers and planners decide *what* to build. Chat and messaging carry the 
 | Run agents in parallel git worktrees on one board | uses the main worktree's `.baton/`, so every agent shares one counter and one lock |
 | See who is blocked and what is stale at a glance | computes answer times, stale threads and per-role load (`baton metrics`, `baton serve`) |
 
+## Compared with what you may use today
+
+| | Enforced hand-off rules | Record in the repo, reviewed in the PR | Works across agent vendors | Needs a server | Typed entries |
+|---|---|---|---|---|---|
+| **baton** | Yes: refused at write time | Yes: `.baton/events/` | Yes: any agent with a shell, MCP optional | No | Yes: question, contract, decision, blocker, hand-off |
+| **A hand-written Markdown file** | No: the rules live in the agents' prompts | Yes, if you commit it | Yes | No | By convention only |
+| **Claude Code [agent teams](https://code.claude.com/docs/en/agent-teams) and [cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging)** | Only through your own hooks (`TaskCompleted` can block a task) | No: tasks and mailboxes live under `~/.claude/` | No: Claude Code only | No | Tasks with states and dependencies; messages are plain text |
+| **[Beads](https://github.com/gastownhall/beads)** | Dependencies: `bd ready` lists only unblocked work | Not as a PR diff: a Dolt database synced through your git remote; `.beads/issues.jsonl` is an export | Yes | No by default; optional server mode | Yes: issues with type, priority, status and links |
+| **[MCP Agent Mail](https://github.com/Dicklesworthstone/mcp_agent_mail)** | No: file reservations are advisory, with an optional pre-commit guard | No: its own git archive and SQLite, outside your code repo | Yes, through MCP | Yes: an MCP server over HTTP (stdio also offered) | Messages with subject, importance and acknowledgement |
+
+These tools do different jobs, and they combine. Beads plans and tracks the work, Agent Mail carries messages and file reservations, and agent teams run Claude Code teammates. baton checks the moment one agent hands work to another, and keeps that exchange in the pull request. Checked against each project's public docs on 2026-10-15; they change fast.
+
 ## FAQ
 
 **Why not an issue tracker?** Trackers track work for people. baton is where agents hand work to each other inside a sprint: it is read by commands in a few thousand tokens, works offline, and refuses a bad hand-off at write time. Keep your tracker for the backlog.
 
-**Why not my framework's built-in memory or agent teams?** Those are tied to one tool. baton is plain files in git, so Claude Code, Codex and Cursor agents can share one board, and a human can review it in a pull request.
+**Why not my framework's built-in memory or agent teams?** Those are tied to one tool and kept outside the repo. baton is plain files in git, so Claude Code, Codex and Cursor agents can share one board, and a human can review it in a pull request. See the [comparison](#compared-with-what-you-may-use-today).
 
 **What if every issue runs in its own sandbox?** Use [sandbox mode](sandbox.md). Each task's agents share a local board, `baton finish` commits it with the PR, a later sandbox on the same issue resumes it, and tasks see each other's contracts once they merge. Sandboxes don't talk to each other live: overlap that needs an answer *now* belongs in your tracker or the PR.
 
 **Does it need a server?** No. Agents run `baton`, which writes files under a lock. The dashboard (`baton serve`) and the MCP server (`baton mcp`) are optional and local.
+
+**How do I start?** Follow [Getting started](getting-started.md): install, try the refusal, then set up your agents.
 
 **Should agents use the command or MCP?** The command. It is the primary interface and has every option. `baton mcp` is for agents that can't run shell commands; its tools map one to one onto the commands and apply the same rules.

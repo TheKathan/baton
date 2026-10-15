@@ -12,7 +12,8 @@ Put a `"policies"` list in `.baton/config.json`:
 "policies": [
   {"rule": "cites",       "kinds": ["H"],      "mode": "refuse"},
   {"rule": "named_to",    "kinds": ["Q", "B"], "mode": "warn"},
-  {"rule": "max_lines",   "kinds": ["D"],      "lines": 15, "mode": "warn"},
+  {"rule": "max_lines",   "kinds": ["D"],      "lines": 2,  "mode": "warn"},
+  {"rule": "files",       "kinds": ["D"],      "mode": "warn"},
   {"rule": "title_match", "kinds": ["H"],      "pattern": "^S\\d+", "mode": "refuse",
    "message": "hand-off titles start with the sprint, e.g. S7-A backend"}
 ]
@@ -61,6 +62,7 @@ The second line shows `message` replacing the default text. The agent fixes the 
 ```console
 $ printf 'a\nb\nc\n' | baton post D --as orchestrator --title "Use dev" -
 warning: policy max_lines (D): body must be at most 2 lines (link long details from a file)
+warning: policy files (D): must list the affected files (--files)
 posted D-002
 ```
 

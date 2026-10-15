@@ -11,7 +11,7 @@ from pathlib import Path
 
 from baton import config
 from baton.cli import main
-from baton.store import Board, BoardError
+from baton.store import Board
 
 SRC = str(Path(__file__).resolve().parent.parent / "src")
 
@@ -323,12 +323,14 @@ class BoardTest(unittest.TestCase):
                            env={**os.environ, "BATON_ROOT": str(self.root)})
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    def test_corrupt_line_is_reported(self):
+    def test_corrupt_line_is_skipped_and_reported(self):
         run("post", "Q", "--as", "qa", "--title", "ok", "x")
         with (self.root / ".baton/events/S1.jsonl").open("a") as f:
             f.write("{not json\n")
-        with self.assertRaises(BoardError):
-            self.board().events()
+        self.assertEqual(len(self.board().events()), 1)
+        _, bad = self.board().scan()
+        self.assertEqual(len(bad), 1)
+        self.assertTrue(bad[0].startswith("S1.jsonl:2: not JSON"))
 
 
 if __name__ == "__main__":

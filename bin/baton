@@ -1,10 +1,29 @@
 #!/usr/bin/env python3
-"""Shim to run baton from a checkout without installing it."""
+"""Launcher for baton: runs it from a checkout or from the npm package, without installing it.
+
+baton needs Python 3.11 or newer. When `python3` is older (a stock macOS ships 3.9), the
+launcher re-runs itself with the newest python3.1x it finds on PATH, and otherwise exits
+with a message that says what to install. Keep this file parseable by old Pythons.
+"""
+import os
+import shutil
 import sys
 from pathlib import Path
 
+CANDIDATES = ("python3.14", "python3.13", "python3.12", "python3.11")
+
 if sys.version_info < (3, 11):
-    sys.exit(f"baton needs Python 3.11 or newer; this is {sys.version.split()[0]} ({sys.executable})")
+    if not os.environ.get("BATON_LAUNCHER_REEXEC"):
+        for name in CANDIDATES:
+            exe = shutil.which(name)
+            if exe:
+                os.environ["BATON_LAUNCHER_REEXEC"] = "1"
+                os.execv(exe, [exe, os.path.abspath(__file__)] + sys.argv[1:])
+    sys.exit(
+        "baton needs Python 3.11 or newer, but python3 is {} ({}).\n"
+        "Install a newer Python (for example `brew install python@3.13`, or https://www.python.org/downloads/),\n"
+        "or run baton with uv, which fetches a suitable Python itself: uvx agent-baton".format(
+            sys.version.split()[0], sys.executable))
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from baton.cli import main  # noqa: E402

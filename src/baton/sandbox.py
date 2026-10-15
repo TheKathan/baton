@@ -15,14 +15,13 @@ it has merged.
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 from pathlib import Path
 
 from . import config
-from .store import Board, BoardError, fold
+from .store import NAME_RE, Board, BoardError, fold
 
-TASK_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+TASK_RE = NAME_RE
 LOCAL_PATHS = (f"/{config.SANDBOX_NAME}", f"/{config.BATON_DIR}/sandbox/")
 # Team settings a sandbox board takes from the project's committed .baton/config.json.
 INHERITED = ("policies", "kinds", "handoff_max_lines", "body_warn_lines", "unread_warn_tokens", "id_width")
@@ -89,12 +88,12 @@ def init(root: Path, task: str, roles: list[str], force: bool = False) -> str:
     resumed = 0
     exported = task_file(root, task)
     if exported.exists() and not any(board.dir.glob("*.jsonl")):
-        events = [json.loads(ln) for ln in exported.read_text().splitlines() if ln.strip()]
-        events.sort(key=lambda e: e.get("ev", 0))
+        events = read_export(exported)
         for e in events:
             board.append_raw({k: v for k, v in e.items() if k != "ev"})
         resumed = len(events)
-        roles_seen = roles or sorted({e["from"] for e in events if e.get("from")})  # all, when unrestricted
+        roles_seen = roles or sorted({e["from"] for e in events
+                                      if isinstance(e.get("from"), str) and NAME_RE.match(e["from"])})
         for role in roles_seen:  # the history was read by the previous sandbox: start at the tip
             board.unread(role)
     note = f"resumed {resumed} event(s) from {exported.relative_to(root)}" if resumed else "new task board"

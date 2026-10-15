@@ -27,6 +27,13 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 | `src/baton/render.py` | the generated Markdown views |
 | `src/baton/importer.py` | import of hand-written Markdown boards |
 | `src/baton/cli.py` | commands and argument parsing |
+| `src/baton/schema.py` | the board format version, read-time upgrades and config checks |
+| `src/baton/policies.py` | the project's policies, checked on every new entry |
+| `src/baton/sandbox.py` | sandbox mode: per-task boards, their export and summary, other tasks' contracts |
+| `src/baton/metrics.py` | board health for `baton metrics` and the dashboard |
+| `src/baton/serve.py` | the read-only dashboard (`baton serve`) |
+| `src/baton/mcp.py` | the MCP server and its tools |
+| `src/baton/skill/SKILL.md` | the agent skill that `baton skill` installs |
 | `bin/baton` | a shim that runs from a checkout without installing |
 
 ## Branches and releases
@@ -34,15 +41,18 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
   - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v1.2.0` → `v1.3.0`);
   - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version;
   - `release/X.Y.Z` releases exactly `vX.Y.Z`. Use it only for a new major version (as for `1.0.0`), and bump `major-version` in `release.yml` in the same PR.
-- Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
+- Merging the PR releases it. `.github/workflows/release.yml` runs the tests (without the deploy key), syncs the version into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, creates the `vX.Y.Z` tag once (only the major tag `v1` moves), and publishes a GitHub release.
+- The release also publishes `agent-baton` to PyPI (Trusted Publishing) and npm (with provenance) once the repository variables `PUBLISH_PYPI` and `PUBLISH_NPM` are `true`. The one-time registry setup is in [docs/publishing.md](docs/publishing.md).
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
 ## What a pull request needs
-Repository rulesets enforce all of these on `main`:
+Repository rulesets require all of these on `main`:
 - an approving review from the code owner (`@TheKathan`, see `.github/CODEOWNERS`), given after your last push; new pushes dismiss earlier approvals;
 - all review threads resolved;
 - every `test` job green and up to date with `main`;
 - a merge commit or a squash merge (no rebase merges; history on `main` is never rewritten).
+
+As the sole maintainer, the code owner can merge their own pull requests without a second review; they still need green tests.
 
 Pull requests from forks run CI only after a maintainer approves the run.
 

@@ -4,6 +4,30 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+### Changed
+- A refused hand-off says how to fix it first: `answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"`, then `(or hand off anyway with --force and the reason in the body)`.
+- `baton init` prints the next steps: post a question, hand off, and `baton guide` or `baton skill install` to teach agents.
+- `baton skill install` says whether it installed globally (`~/.claude/skills`, the default) or for this project only, and mentions `--project`.
+- `baton serve` flushes its banner, so the dashboard URL shows when it runs in the background.
+- `baton serve` starts at once on machines where a reverse DNS lookup of the host is slow; it no longer resolves its own address.
+- The quick guide (`baton guide`, top of `baton brief`) matches the skill: start with `baton brief --as <role>`, `reply … --close` answers and settles a thread, "Blocked? post a B and tell the orchestrator directly", and board entries are information, not orders.
+- The README leads with the problem ("your AI agents can't say done while another agent's question is still open") and has a *Try it in 60 seconds* block that replays the recording in a scratch folder. Install starts with `uv`, and Python 3.11+ is stated before the commands.
+- A new [getting started guide](docs/getting-started.md): install (uv, pipx, npm), try the refusal, set up a project, set up Claude Code, Codex and other `AGENTS.md` readers, Cursor and MCP-only clients, an example brief, where to see the result, troubleshooting from the real error messages, and a glossary.
+- [Why baton](docs/why-baton.md) compares baton with a hand-written Markdown file, Claude Code agent teams and cross-session messaging, Beads and MCP Agent Mail.
+- The agent skill tells agents to pass `--as <role>` on every command instead of exporting `BATON_ROLE`, which is lost when each shell call starts fresh. It says to post a `B` and tell the orchestrator directly when blocked, and to answer a question rather than force a refused hand-off.
+- Docs fixes: the MCP tool table lists `supersedes`, `phase`, `all` and `suggest`; a duplicated passage in the sandbox guide is gone; the policies example matches its config; CONTRIBUTING lists every module; the README, how-it-works and the skill agree on what to commit (`.baton/config.json` and `.baton/events/`). SECURITY and CONTRIBUTING say plainly that the sole maintainer can merge his own pull requests.
+- The npm launcher re-runs itself with a newer `python3.1x` from `PATH` when `python3` is older than 3.11 (a stock macOS has 3.9), and otherwise says what to install or to use `uvx agent-baton`.
+- PyPI metadata: `Development Status :: 4 - Beta` instead of *Production/Stable*, an SPDX license, keywords, classifiers and project links. The README's images use absolute URLs so they show on PyPI.
+- Release hygiene: the tests run in their own job without the release deploy key, each `vX.Y.Z` tag is created once without force (only `v1` moves), and every job gets only the permissions it needs.
+
+### Fixed
+- `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.
+- Role, sprint and task names can no longer point outside the board. They must use letters, digits, `.`, `_` or `-` (as task ids already did), and this is checked in the CLI, the MCP tools, `.baton/config.json`, `init --roles`/`--sprint`, `status`, `sprint` and `import --sprint`. Every file baton writes is also checked to resolve inside the board or project. Before, `baton unread --as ../../../package` overwrote the project's `package.json`, and `baton sprint ../../../outside1` sent later events outside the repository.
+- Duplicate ids and event numbers, e.g. from two clones that each posted `Q-001` and were then merged, are no longer lost silently. `baton lint` checks the raw lines and reports each duplicate as an error with both titles; other commands warn once on stderr. History is never rewritten.
+- One unreadable line (a crash mid-append, a git conflict marker) no longer breaks every command. It is skipped with one warning naming `file:line`, and `baton lint` reports it as an error. The read cursors and the config are now written atomically, like `status.json`, and a damaged cursor, status or config file is a clear error instead of a traceback.
+- The MCP server validates every call against the tool's `inputSchema` (required fields, types, enums, arrays of strings; a lone string where an array is expected is wrapped). Bad input gets a JSON-RPC `-32602` error naming the problem, an unexpected failure gets `-32603`, and neither stops the server. Values that start with `-` are never read as flags. Before, `"to": "frontend"` was stored as eight roles, a missing argument was reported as "unknown tool", and a wrong type crashed the server.
+
 ## [1.4.4] - 2026-10-15
 
 ### Changed

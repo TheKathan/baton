@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import json
+import socketserver
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -220,16 +221,22 @@ def make_handler(board: Board):
     return Handler
 
 
+class _Server(ThreadingHTTPServer):
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = str(self.server_address[0]), self.server_address[1]
+
+
 def make_server(board: Board, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((host, port), make_handler(board))
+    return _Server((host, port), make_handler(board))
 
 
 def run(board: Board, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> None:
     server = make_server(board, host, port)
     url = f"http://{host}:{server.server_address[1]}/"
     if host not in ("127.0.0.1", "localhost", "::1"):
-        print(f"warning: serving on {host}; anyone who can reach it can read the board")
-    print(f"baton dashboard on {url} (read-only; Ctrl-C to stop)")
+        print(f"warning: serving on {host}; anyone who can reach it can read the board", flush=True)
+    print(f"baton dashboard on {url} (read-only; Ctrl-C to stop)", flush=True)
     if open_browser:
         webbrowser.open(url)
     try:
