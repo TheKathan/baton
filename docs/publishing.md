@@ -13,6 +13,14 @@ Both jobs check out the release tag without the deploy key, and only they get `i
 
 ## One-time setup
 
+The repository allows only GitHub-owned and `TheKathan/*` actions, plus `pypa/gh-action-pypi-publish` at the commit `release.yml` pins. A workflow that names any other action is rejected before it starts, so when Dependabot bumps that pin, allow the new commit first (Settings → Actions → General, or the API below), then merge:
+
+```bash
+gh api -X PUT repos/TheKathan/baton/actions/permissions/selected-actions \
+  -F github_owned_allowed=true -F verified_allowed=false \
+  -f 'patterns_allowed[]=TheKathan/*' -f 'patterns_allowed[]=pypa/gh-action-pypi-publish@<new sha>'
+```
+
 Use the names below exactly; they are the ones the workflow expects.
 
 ### 1. GitHub environments

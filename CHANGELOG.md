@@ -22,6 +22,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Release hygiene: the tests run in their own job without the release deploy key, each `vX.Y.Z` tag is created once without force (only `v1` moves), and every job gets only the permissions it needs.
 
 ### Fixed
+- The release workflow starts again: the repository's allowed-actions list now includes the pinned PyPI publishing action, which GitHub otherwise rejects before the run starts (even with publishing switched off).
 - `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.
 - Role, sprint and task names can no longer point outside the board. They must use letters, digits, `.`, `_` or `-` (as task ids already did), and this is checked in the CLI, the MCP tools, `.baton/config.json`, `init --roles`/`--sprint`, `status`, `sprint` and `import --sprint`. Every file baton writes is also checked to resolve inside the board or project. Before, `baton unread --as ../../../package` overwrote the project's `package.json`, and `baton sprint ../../../outside1` sent later events outside the repository.
 - Duplicate ids and event numbers, e.g. from two clones that each posted `Q-001` and were then merged, are no longer lost silently. `baton lint` checks the raw lines and reports each duplicate as an error with both titles; other commands warn once on stderr. History is never rewritten.
