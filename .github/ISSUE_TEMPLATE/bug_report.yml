@@ -1,0 +1,67 @@
+name: Bug report
+description: baton did something wrong or unexpected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Board files are plain text: remove secrets and private data from anything you paste.
+        For a security problem, use [private vulnerability reporting](https://github.com/TheKathan/baton/security/advisories/new) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and what it printed.
+      render: console
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of commands that shows the problem, ideally from `baton init`.
+      placeholder: |
+        baton init --roles backend,qa
+        baton post Q --as qa --to backend --title "…" "…"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: baton version
+      description: The output of `baton --version`.
+      placeholder: baton 1.4.2
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: How you ran it
+      options:
+        - baton command
+        - MCP server (baton mcp)
+        - GitHub Action (setup-baton, baton-task or baton-check)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: The output of `python3 --version`.

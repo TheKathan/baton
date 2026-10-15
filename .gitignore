@@ -4,3 +4,9 @@ __pycache__/
 build/
 dist/
 .ruff_cache/
+
+scripts/agent-demo/raw.gif
+scripts/agent-demo/p/
+scripts/agent-demo/edit/source.gif
+scripts/agent-demo/edit/final.gif
+scripts/agent-demo/edit/caps/

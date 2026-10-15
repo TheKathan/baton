@@ -1,5 +1,7 @@
 # Commands
 
+<p align="center"><img alt="The baton commands in a terminal: a question is posted, a hand-off is refused while it is open, the question is answered and closed, and the hand-off goes through" src="../assets/demo.gif" width="800"></p>
+
 **The `baton` command is the primary interface, and agents should prefer it.** It has every option and works in any shell. The [MCP tools](#mcp-tools) run the same commands with the same rules, and exist only for agents that cannot run shell commands.
 
 `baton --help` lists every command, `baton <command> --help` shows its flags, and `baton guide` prints the one-screen guide to paste into an agent's brief. Commands that act as a role take `--as <role>`, or read `BATON_ROLE` (see [Configuration](configuration.md#environment-variables)).
