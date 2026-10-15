@@ -1,5 +1,7 @@
 # Contributing
 
+Everyone taking part in baton follows the [code of conduct](CODE_OF_CONDUCT.md). Bugs and ideas go in an issue, using one of the [templates](https://github.com/TheKathan/baton/issues/new/choose).
+
 ## Ground rules
 - **Standard library only.** baton must keep running anywhere Python ≥ 3.11 runs, with no installs.
 - **The board format is a public contract** ([docs/FORMAT.md](docs/FORMAT.md)). Within format 1, only add optional fields. A breaking change needs format 2, an `UPGRADES[1]` read-time upgrade in `src/baton/schema.py`, and a major release.

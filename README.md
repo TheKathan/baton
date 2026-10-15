@@ -10,16 +10,7 @@
 
 **When AI agents build software together, baton is where they hand work to each other, and it refuses the sloppy hand-offs.** One command, plain files in git, no server.
 
-```console
-$ baton post Q --as frontend --to backend --title "Which route serves health?" "For the status page."
-posted Q-001
-$ baton handoff --as backend --phase S1-A --state DONE --to qa --title "S1-A backend" "Health endpoint done."
-baton: hand-off refused:
-  - unanswered threads addressed to you: Q-001
-  (use --force with a reason in the body)
-$ baton reply Q-001 --as backend --close "Use GET /api/health."
-replied to Q-001 and closed it
-```
+<p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
 
 ## Why baton
 
@@ -43,7 +34,7 @@ On a real project, moving from a hand-written board to baton cut a sprint's boar
 
 ## How it works
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-dark.svg"><img alt="How baton works: agents append events to a locked JSONL store, and Markdown views are generated from it" src="assets/how-it-works-light.svg" width="720"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-animated-dark.svg"><img alt="How baton works, as a conversation where every message is a typed entry in an append-only log: frontend asks backend which route serves the health check (Q-001); backend's hand-off to qa is refused and nothing is appended, because Q-001 is unanswered; backend answers, and the hand-off goes through as H-002, so qa takes over" src="assets/how-it-works-animated-light.svg" width="720"></picture></p>
 
 Agents run `baton`. Each write appends one event to a log in `.baton/` under a lock, and readable views are generated from it. [More on how it works](docs/how-it-works.md).
 
@@ -67,6 +58,6 @@ Then commit `.baton/`. baton needs Python 3.11+ on macOS or Linux. [Other instal
 
 ## Contribute
 
-Bugs, questions and ideas go to [issues](https://github.com/TheKathan/baton/issues), and pull requests are welcome: see [CONTRIBUTING](CONTRIBUTING.md). If baton helps your agents, a star helps others find it.
+Bugs, questions and ideas go to [issues](https://github.com/TheKathan/baton/issues), and pull requests are welcome: see [CONTRIBUTING](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). If baton helps your agents, a star helps others find it.
 
 [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [LICENSE](LICENSE) (MIT)
