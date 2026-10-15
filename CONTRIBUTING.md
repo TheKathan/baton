@@ -41,7 +41,8 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
   - `feature/<topic>` or `feat/<topic>` bumps the minor version (`v1.2.0` → `v1.3.0`);
   - any other branch name (`fix/`, `docs/`, `chore/`, `refactor/`, `ci/` …) bumps the patch version;
   - `release/X.Y.Z` releases exactly `vX.Y.Z`. Use it only for a new major version (as for `1.0.0`), and bump `major-version` in `release.yml` in the same PR.
-- Merging the PR releases it. `.github/workflows/release.yml` tags the version, syncs it into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, and publishes a GitHub release.
+- Merging the PR releases it. `.github/workflows/release.yml` runs the tests (without the deploy key), syncs the version into `src/baton/__init__.py`, `package.json`, the README badge and `CHANGELOG.md`, creates the `vX.Y.Z` tag once (only the major tag `v1` moves), and publishes a GitHub release.
+- The release also publishes `agent-baton` to PyPI (Trusted Publishing) and npm (with provenance) once the repository variables `PUBLISH_PYPI` and `PUBLISH_NPM` are `true`. The one-time registry setup is in [docs/publishing.md](docs/publishing.md).
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
 ## What a pull request needs

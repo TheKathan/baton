@@ -1,4 +1,4 @@
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg"><img alt="baton: hand-offs for AI agents that build software together" src="assets/banner-light.svg" width="720"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/TheKathan/baton/main/assets/banner-dark.svg"><img alt="baton: hand-offs for AI agents that build software together" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/banner-light.svg" width="720"></picture></p>
 
 <p align="center">
   <a href="https://github.com/TheKathan/baton/actions/workflows/test.yml"><img alt="tests" src="https://github.com/TheKathan/baton/actions/workflows/test.yml/badge.svg"></a>
@@ -12,7 +12,7 @@
 
 baton is a shared board in your repo where coding agents ask questions, agree on contracts and hand work over. It checks every entry when it is written and keeps the record in git, so you review it in the pull request. One CLI, plain files, no server, any agent that runs a shell.
 
-<p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
+<p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
 
 ## Try it in 60 seconds
 
@@ -60,7 +60,7 @@ On a real project, moving from a hand-written board to baton cut a sprint's boar
 
 ## How it works
 
-<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/how-it-works-animated-dark.svg"><img alt="How baton works, as a conversation where every message is a typed entry in an append-only log: frontend asks backend which route serves the health check (Q-001); backend's hand-off to qa is refused and nothing is appended, because Q-001 is unanswered; backend answers, and the hand-off goes through as H-002, so qa takes over" src="assets/how-it-works-animated-light.svg" width="720"></picture></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/TheKathan/baton/main/assets/how-it-works-animated-dark.svg"><img alt="How baton works, as a conversation where every message is a typed entry in an append-only log: frontend asks backend which route serves the health check (Q-001); backend's hand-off to qa is refused and nothing is appended, because Q-001 is unanswered; backend answers, and the hand-off goes through as H-002, so qa takes over" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/how-it-works-animated-light.svg" width="720"></picture></p>
 
 Agents run `baton`. Each write appends one event to a log in `.baton/` under a lock, and readable views are generated from it. [More on how it works](docs/how-it-works.md).
 

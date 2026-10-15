@@ -5,8 +5,6 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
-- `baton demo`: a 20-second narrated walkthrough on a throwaway board. frontend asks backend a question, backend's hand-off is refused while it's open, backend answers and the hand-off goes through, then a look at `baton list` and `baton status`. Every step runs the real commands on a temporary board, so the current project is never touched. `--fast` skips the pauses; `--keep DIR` keeps the board to explore.
-
 ### Changed
 - A refused hand-off says how to fix it first: `answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"`, then `(or hand off anyway with --force and the reason in the body)`.
 - `baton init` prints the next steps: post a question, hand off, and `baton guide` or `baton skill install` to teach agents.
@@ -18,6 +16,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - [Why baton](docs/why-baton.md) compares baton with a hand-written Markdown file, Claude Code agent teams and cross-session messaging, Beads and MCP Agent Mail.
 - The agent skill tells agents to pass `--as <role>` on every command instead of exporting `BATON_ROLE`, which is lost when each shell call starts fresh. It says to post a `B` and tell the orchestrator directly when blocked, and to answer a question rather than force a refused hand-off.
 - Docs fixes: the MCP tool table lists `supersedes`, `phase`, `all` and `suggest`; a duplicated passage in the sandbox guide is gone; the policies example matches its config; CONTRIBUTING lists every module; the README, how-it-works and the skill agree on what to commit (`.baton/config.json` and `.baton/events/`). SECURITY and CONTRIBUTING say plainly that the sole maintainer can merge his own pull requests.
+- The npm launcher re-runs itself with a newer `python3.1x` from `PATH` when `python3` is older than 3.11 (a stock macOS has 3.9), and otherwise says what to install or to use `uvx agent-baton`.
+- PyPI metadata: `Development Status :: 4 - Beta` instead of *Production/Stable*, an SPDX license, keywords, classifiers and project links. The README's images use absolute URLs so they show on PyPI.
+- Release hygiene: the tests run in their own job without the release deploy key, each `vX.Y.Z` tag is created once without force (only `v1` moves), and every job gets only the permissions it needs.
 
 ### Fixed
 - `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.
