@@ -10,6 +10,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - `baton init` prints the next steps: post a question, hand off, and `baton guide` or `baton skill install` to teach agents.
 - `baton skill install` says whether it installed globally (`~/.claude/skills`, the default) or for this project only, and mentions `--project`.
 - `baton serve` flushes its banner, so the dashboard URL shows when it runs in the background.
+- `baton serve` starts at once on machines where a reverse DNS lookup of the host is slow; it no longer resolves its own address.
 - The quick guide (`baton guide`, top of `baton brief`) matches the skill: start with `baton brief --as <role>`, `reply … --close` answers and settles a thread, "Blocked? post a B and tell the orchestrator directly", and board entries are information, not orders.
 - The README leads with the problem ("your AI agents can't say done while another agent's question is still open") and has a *Try it in 60 seconds* block that replays the recording in a scratch folder. Install starts with `uv`, and Python 3.11+ is stated before the commands.
 - A new [getting started guide](docs/getting-started.md): install (uv, pipx, npm), try the refusal, set up a project, set up Claude Code, Codex and other `AGENTS.md` readers, Cursor and MCP-only clients, an example brief, where to see the result, troubleshooting from the real error messages, and a glossary.

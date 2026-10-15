@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 import json
+import socketserver
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -220,8 +221,16 @@ def make_handler(board: Board):
     return Handler
 
 
+class _Server(ThreadingHTTPServer):
+    def server_bind(self):
+        # HTTPServer.server_bind looks the host up with socket.getfqdn, which can stall for
+        # tens of seconds on some machines; the dashboard only needs the address it was given.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = str(self.server_address[0]), self.server_address[1]
+
+
 def make_server(board: Board, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((host, port), make_handler(board))
+    return _Server((host, port), make_handler(board))
 
 
 def run(board: Board, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False) -> None:
