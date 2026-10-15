@@ -98,7 +98,7 @@ def _play(root: Path, fast: bool, out) -> None:
             typed(shlex.join(["baton", *argv]))
             if argv[0] == "init":  # init takes its root as a flag, never the current directory
                 ok, text = _call([*argv, "--root", str(root)])
-                text = text.replace(str(root) + os.sep, "")
+                text = text.replace(str(root) + os.sep, "").splitlines()[0]  # its next-step hints come at the end
             else:
                 ok, text = _call(argv)
             colour = s.green if ok and argv[0] in ("handoff", "reply") else (s.red if not ok else "")

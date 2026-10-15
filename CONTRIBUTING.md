@@ -52,7 +52,7 @@ Repository rulesets require all of these on `main`:
 - every `test` job green and up to date with `main`;
 - a merge commit or a squash merge (no rebase merges; history on `main` is never rewritten).
 
-As the sole maintainer, the code owner can merge his own pull requests without a second review; they still need green tests.
+As the sole maintainer, the code owner can merge their own pull requests without a second review; they still need green tests.
 
 Pull requests from forks run CI only after a maintainer approves the run.
 
