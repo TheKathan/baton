@@ -109,77 +109,126 @@ def tools() -> list[dict]:
     return out
 
 
+INVALID_PARAMS, INTERNAL_ERROR = -32602, -32603
+_TYPES = {"string": str, "boolean": bool, "object": dict}
+
+
+class InvalidParams(ValueError):
+    pass
+
+
+def _value(key: str, schema: dict, v):
+    """Check one argument against its schema; a lone string where an array is expected is wrapped."""
+    kind = schema.get("type")
+    if kind == "array":
+        if isinstance(v, str):
+            v = [v]
+        if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+            raise InvalidParams(f"{key}: expected an array of strings")
+        return v
+    if not isinstance(v, _TYPES[kind]):
+        raise InvalidParams(f"{key}: expected a {kind}, got {type(v).__name__}")
+    if "enum" in schema and v not in schema["enum"]:
+        raise InvalidParams(f"{key}: must be one of {', '.join(map(str, schema['enum']))}")
+    return v
+
+
+def validate(schema: dict, args) -> dict:
+    """`args` checked against a tool's inputSchema (the subset TOOLS use: object, required, enum,
+    string, boolean, array of strings). Raises InvalidParams."""
+    if not isinstance(args, dict):
+        raise InvalidParams("arguments must be an object")
+    props = schema.get("properties", {})
+    unknown = sorted(k for k in args if k not in props)
+    if unknown and schema.get("additionalProperties") is False:
+        raise InvalidParams(f"unknown argument(s): {', '.join(unknown)}")
+    missing = [k for k in schema.get("required", []) if args.get(k) is None]
+    if missing:
+        raise InvalidParams(f"missing required argument(s): {', '.join(missing)}")
+    return {k: _value(k, props[k], v) for k, v in args.items() if v is not None and k in props}
+
+
 def _csv(values) -> str:
     return ",".join(values or [])
 
 
+def _opt(name: str, value: str) -> str:
+    """`--name=value`, so a value that starts with '-' is never read as a flag."""
+    return f"--{name}={value}"
+
+
 def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
-    role = ["--as", a["role"]] if a.get("role") else []
+    role = [_opt("as", a["role"])] if a.get("role") else []
     if name == "baton_brief":
-        return ["brief", *role] + (["--ids", _csv(a["ids"])] if a.get("ids") else [])
+        return ["brief", *role] + ([_opt("ids", _csv(a["ids"]))] if a.get("ids") else [])
     if name == "baton_unread":
         return ["unread", *role] + (["--peek"] if a.get("peek") else [])
     if name == "baton_show":
-        return ["show", *a["ids"]]
+        return ["show", "--", *a["ids"]]
     if name == "baton_open":
         return (["open", *role] + (["--all"] if a.get("all") else [])
-                + (["--blocking"] if a.get("blocking") else []) + (["--stale", a["stale"]] if a.get("stale") else []))
+                + (["--blocking"] if a.get("blocking") else []) + ([_opt("stale", a["stale"])] if a.get("stale") else []))
     if name == "baton_post":
-        out = ["post", a["kind"], *role, "--to", _csv(a["to"]), "--title", a["title"], "--body-file", body_file]
+        out = ["post", *role, _opt("to", _csv(a["to"])), _opt("title", a["title"]), _opt("body-file", body_file)]
         for key in ("files", "cites", "blocks", "supersedes"):
             if a.get(key):
-                out += [f"--{key}", _csv(a[key])]
-        return out
+                out.append(_opt(key, _csv(a[key])))
+        return out + ["--", a["kind"]]
     if name == "baton_reply":
-        return ["reply", a["id"], *role, "--body-file", body_file] + (["--close"] if a.get("close") else [])
+        return ["reply", *role, _opt("body-file", body_file)] + (["--close"] if a.get("close") else []) + ["--", a["id"]]
     if name == "baton_close":
-        return (["close", *(a.get("ids") or []), *role] + (["--sprint", a["sprint"]] if a.get("sprint") else [])
-                + (["--phase", a["phase"]] if a.get("phase") else [])
-                + (["--reason", a["reason"]] if a.get("reason") else []))
+        return (["close", *role] + ([_opt("sprint", a["sprint"])] if a.get("sprint") else [])
+                + ([_opt("phase", a["phase"])] if a.get("phase") else [])
+                + ([_opt("reason", a["reason"])] if a.get("reason") else [])
+                + (["--", *a["ids"]] if a.get("ids") else []))
     if name == "baton_handoff":
-        out = ["handoff", *role, "--phase", a["phase"], "--state", a["state"], "--to", _csv(a["to"]),
-               "--title", a["title"], "--body-file", body_file]
+        out = ["handoff", *role, _opt("phase", a["phase"]), _opt("state", a["state"]), _opt("to", _csv(a["to"])),
+               _opt("title", a["title"]), _opt("body-file", body_file)]
         for key in ("files", "cites", "closes"):
             if a.get(key):
-                out += [f"--{key}", _csv(a[key])]
+                out.append(_opt(key, _csv(a[key])))
         return out + (["--force"] if a.get("force") else [])
     if name == "baton_status":
         if a.get("state"):
-            return ["status", *role, "--state", a["state"]] + (["--phase", a["phase"]] if a.get("phase") else [])
+            return ["status", *role, _opt("state", a["state"])] + ([_opt("phase", a["phase"])] if a.get("phase") else [])
         return ["status"]
     if name == "baton_grep":
-        return ["grep", a["text"]]
+        return ["grep", "--", a["text"]]
     if name == "baton_list":
         out = ["list"]
         for key in ("sprint", "kind", "status"):
             if a.get(key):
-                out += [f"--{key}", a[key]]
+                out.append(_opt(key, a[key]))
         return out + role
     if name == "baton_contracts":
-        return ["contracts"] + (["--paths", _csv(a["paths"])] if a.get("paths") else [])
+        return ["contracts"] + ([_opt("paths", _csv(a["paths"]))] if a.get("paths") else [])
     if name == "baton_sandbox_start":
         root = os.environ.get("BATON_ROOT") or os.getcwd()
-        return (["init", "--sandbox", "--task", a["task"], "--root", root]
-                + (["--roles", _csv(a["roles"])] if a.get("roles") else [])
+        return (["init", "--sandbox", _opt("task", a["task"]), _opt("root", root)]
+                + ([_opt("roles", _csv(a["roles"]))] if a.get("roles") else [])
                 + (["--force"] if a.get("force") else []))
     if name == "baton_finish":
         return ["finish"] + (["--strict"] if a.get("strict") else [])
     if name == "baton_sprint":
-        return ["sprint", a["name"]]
+        return ["sprint", "--", a["name"]]
     if name == "baton_metrics":
         out = ["metrics"]
         for key in ("sprint", "stale"):
             if a.get(key):
-                out += [f"--{key}", a[key]]
+                out.append(_opt(key, a[key]))
         return out
     if name == "baton_lint":
         return ["lint"] + (["--all"] if a.get("all") else []) + (["--suggest"] if a.get("suggest") else [])
-    raise KeyError(name)
+    raise InvalidParams(f"unknown tool {name}")
 
 
-def call_tool(name: str, args: dict) -> tuple[str, bool]:
-    """Run a tool; return (text, is_error)."""
+def call_tool(name: str, args) -> tuple[str, bool]:
+    """Run a tool; return (text, is_error). Raises InvalidParams for an unknown tool or bad arguments."""
     from .cli import main as cli_main
+    schema = next((t["inputSchema"] for t in tools() if t["name"] == name), None)
+    if schema is None:
+        raise InvalidParams(f"unknown tool {name}")
+    args = validate(schema, args)
     body_file = None
     try:
         if "body" in args:
@@ -198,16 +247,20 @@ def call_tool(name: str, args: dict) -> tuple[str, bool]:
                     err.write(str(e.code))
         text = (out.getvalue() + err.getvalue()).strip() or "(no output)"
         return text, code != 0
-    except KeyError:
-        return f"unknown tool {name}", True
     finally:
         if body_file:
             with contextlib.suppress(OSError):
                 os.unlink(body_file)
 
 
-def handle(msg: dict) -> dict | None:
+def _error(mid, code: int, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
+
+
+def handle(msg) -> dict | None:
     """Handle one JSON-RPC message; return the response, or None for notifications."""
+    if not isinstance(msg, dict):
+        return _error(None, -32600, "invalid request: expected a JSON object")
     method, mid = msg.get("method"), msg.get("id")
     if mid is None:  # notification (e.g. notifications/initialized)
         return None
@@ -215,8 +268,11 @@ def handle(msg: dict) -> dict | None:
     def ok(result):
         return {"jsonrpc": "2.0", "id": mid, "result": result}
 
+    params = msg.get("params") or {}
+    if not isinstance(params, dict):
+        return _error(mid, INVALID_PARAMS, "params must be an object")
     if method == "initialize":
-        asked = (msg.get("params") or {}).get("protocolVersion")
+        asked = params.get("protocolVersion")
         from .cli import GUIDE
         return ok({"protocolVersion": asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0],
                    "capabilities": {"tools": {}},
@@ -229,10 +285,15 @@ def handle(msg: dict) -> dict | None:
     if method == "tools/list":
         return ok({"tools": tools()})
     if method == "tools/call":
-        params = msg.get("params") or {}
-        text, is_error = call_tool(params.get("name", ""), params.get("arguments") or {})
+        name = params.get("name")
+        if not isinstance(name, str):
+            return _error(mid, INVALID_PARAMS, "params.name must be a tool name")
+        try:
+            text, is_error = call_tool(name, params.get("arguments") or {})
+        except InvalidParams as e:
+            return _error(mid, INVALID_PARAMS, f"{name}: {e}")
         return ok({"content": [{"type": "text", "text": text}], "isError": is_error})
-    return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {method}"}}
+    return _error(mid, -32601, f"method not found: {method}")
 
 
 def serve(stdin=None, stdout=None) -> None:
@@ -243,9 +304,13 @@ def serve(stdin=None, stdout=None) -> None:
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
-            reply = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}}
+            reply = _error(None, -32700, "parse error")
         else:
-            reply = handle(msg)
+            try:
+                reply = handle(msg)
+            except Exception as e:  # noqa: BLE001 - one bad call must never stop the server
+                mid = msg.get("id") if isinstance(msg, dict) else None
+                reply = _error(mid, INTERNAL_ERROR, f"internal error: {type(e).__name__}: {e}")
         if reply is not None:
             stdout.write(json.dumps(reply, ensure_ascii=False) + "\n")
             stdout.flush()

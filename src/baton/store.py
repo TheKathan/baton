@@ -20,15 +20,22 @@ from __future__ import annotations
 
 import fcntl
 import json
+import re
+import sys
 import time
+from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
 
 from . import policies
+from .config import write_atomic
 from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
 
 ALL = "all"
 LOCAL_DIR = ".local"  # per-checkout data under the board dir, never committed
+# Roles, sprints and task ids become file names, so they are kept to a safe set of characters.
+NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_warned: set[str] = set()  # stderr warnings already printed by this command
 
 
 class BoardError(Exception):
@@ -48,6 +55,30 @@ def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def check_name(value: str, what: str) -> str:
+    if not isinstance(value, str) or not NAME_RE.match(value):
+        raise BoardError(f"{what} {value!r}: use letters, digits, '.', '_' or '-', starting with a letter "
+                         "or digit (at most 64 characters)")
+    return value
+
+
+def inside(path: Path, base: Path) -> Path:
+    """`path`, after checking it resolves inside `base` (no write ever leaves the board)."""
+    if not path.resolve().is_relative_to(base.resolve()):
+        raise BoardError(f"refusing to write {path}: it is outside {base}")
+    return path
+
+
+def warn_once(message: str) -> None:
+    if message not in _warned:
+        _warned.add(message)
+        print(f"baton: warning: {message}", file=sys.stderr)
+
+
+def reset_warnings() -> None:
+    _warned.clear()
+
+
 class Board:
     def __init__(self, root: Path, cfg: dict):
         self.root = root
@@ -55,9 +86,16 @@ class Board:
         self.dir = root / cfg["dir"]
         self.cursors = self.dir / ".cursors"
         self.last_warnings: list[str] = []
+        self.warn = True  # warn on stderr about unreadable lines and duplicate ids (lint reports them itself)
         try:
             policies.validate(cfg.get("policies"))
         except policies.PolicyError as e:
+            raise BoardError(f".baton/config.json: {e}") from None
+        try:
+            check_name(cfg["sprint"], "sprint")
+            for r in cfg.get("roles") or []:
+                check_name(r, "role")
+        except BoardError as e:
             raise BoardError(f".baton/config.json: {e}") from None
         try:
             check_config(cfg, str(root / ".baton/config.json"))
@@ -80,20 +118,44 @@ class Board:
             return []
         return sorted(self.dir.glob("*.jsonl"))
 
-    def events(self) -> list[dict]:
-        out = []
+    def scan(self) -> tuple[list[tuple[str, dict]], list[str]]:
+        """([(file:line, event)], ["file:line: why"]): every readable event, and the unreadable lines
+        (a crash mid-append, a git conflict marker). A newer format is still refused, never half-read."""
+        out, bad = [], []
         for p in self.sprint_files():
             with p.open() as f:
                 for i, line in enumerate(f, 1):
-                    if line.strip():
-                        try:
-                            raw = json.loads(line)
-                        except json.JSONDecodeError as e:
-                            raise BoardError(f"{p.name}:{i}: corrupt line ({e})") from e
-                        try:
-                            out.append(upgrade(raw, f"{p.name}:{i}"))
-                        except FormatError as e:
-                            raise BoardFormatError(str(e)) from None
+                    if not line.strip():
+                        continue
+                    where = f"{p.name}:{i}"
+                    try:
+                        raw = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        bad.append(f"{where}: not JSON ({e})")
+                        continue
+                    if not (isinstance(raw, dict) and isinstance(raw.get("ev"), int)
+                            and raw.get("type") and raw.get("id")):
+                        bad.append(f"{where}: not a baton event")
+                        continue
+                    try:
+                        out.append((where, upgrade(raw, where)))
+                    except FormatError as e:
+                        raise BoardFormatError(str(e)) from None
+        return out, bad
+
+    def events(self) -> list[dict]:
+        located, bad = self.scan()
+        if self.warn:
+            if bad:
+                warn_once(f"skipped {len(bad)} unreadable line(s): {', '.join(b.split(': ')[0] for b in bad)}"
+                          " (fix or delete them by hand; `baton lint` lists them)")
+            dups, evs = duplicates(located)
+            if dups or evs:
+                what = ([f"ids {', '.join(dups)}"] if dups else []) + (
+                    [f"event numbers {', '.join(map(str, evs))}"] if evs else [])
+                warn_once(f"duplicates on the board (e.g. after a git merge): {'; '.join(what)}. Only the "
+                          "later entry of a duplicate id is shown; `baton lint` lists them all")
+        out = [e for _, e in located]
         out.sort(key=lambda e: e["ev"])
         return out
 
@@ -108,7 +170,7 @@ class Board:
         event.setdefault("ts", now())
         if stamp:
             event.setdefault("at", utc_now())
-        path = self.dir / f"{event['sprint']}.jsonl"
+        path = inside(self.dir / f"{event['sprint']}.jsonl", self.dir)
         with path.open("a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
             f.flush()
@@ -133,7 +195,16 @@ class Board:
     # ---------- status (one row per role) ----------
     def status(self) -> dict[str, dict]:
         p = self.dir / "status.json"
-        return json.loads(p.read_text()) if p.exists() else {}
+        if not p.exists():
+            return {}
+        try:
+            rows = json.loads(p.read_text())
+        except ValueError as e:
+            raise BoardError(f"{p}: not valid JSON ({e}); fix it, or delete it to start the status table "
+                             "again") from None
+        if not isinstance(rows, dict):
+            raise BoardError(f"{p} must contain a JSON object; fix it, or delete it")
+        return rows
 
     def set_status(self, role: str, phase: str, state: str, handoff: str = "") -> dict:
         self._check_role(role)
@@ -142,9 +213,7 @@ class Board:
             prev = rows.get(role, {})
             rows[role] = {"phase": phase or prev.get("phase", ""), "state": state,
                           "handoff": handoff or prev.get("handoff", ""), "updated": now()}
-            tmp = self.dir / "status.json.tmp"
-            tmp.write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n")
-            tmp.replace(self.dir / "status.json")
+            write_atomic(self.dir / "status.json", json.dumps(rows, indent=2, ensure_ascii=False) + "\n")
             return rows[role]
 
     def max_number(self) -> int:
@@ -158,6 +227,7 @@ class Board:
         roles = self.cfg.get("roles") or []
         if not role:
             raise BoardError("a role is required (--as <role> or $BATON_ROLE)")
+        check_name(role, "role")
         if roles and role not in roles:
             raise BoardError(f"unknown role {role!r}; known: {', '.join(roles)}")
 
@@ -260,15 +330,27 @@ class Board:
             return True
         return not named_only and ALL in t["to"]
 
+    def cursor_path(self, role: str) -> Path:
+        return inside(self.cursors / f"{check_name(role, 'role')}.json", self.cursors)
+
     def cursor(self, role: str) -> int:
-        cp = self.cursors / f"{role}.json"
-        return json.loads(cp.read_text()).get("ev", 0) if cp.exists() else 0
+        cp = self.cursor_path(role)
+        if not cp.exists():
+            return 0
+        try:
+            ev = json.loads(cp.read_text()).get("ev", 0)
+        except (ValueError, AttributeError):
+            ev = None
+        if not isinstance(ev, int):
+            raise BoardError(f"{cp} is damaged; delete it (or run `baton unread --as {role} --mark-read` "
+                             "after deleting it) to reset the read cursor")
+        return ev
 
     def unread(self, role: str, everything: bool = False, peek: bool = False) -> list[dict]:
         """Events after the role's cursor that concern it. Advances the cursor unless peek."""
         self._check_role(role)
         self.cursors.mkdir(parents=True, exist_ok=True)
-        cp = self.cursors / f"{role}.json"
+        cp = self.cursor_path(role)
         seen = self.cursor(role)
         events = self.events()
         threads = self.entries()
@@ -282,7 +364,7 @@ class Board:
             if everything or self.involves(t, role):
                 out.append(e)
         if not peek and events:
-            cp.write_text(json.dumps({"ev": events[-1]["ev"]}))
+            write_atomic(cp, json.dumps({"ev": events[-1]["ev"]}))
         return out
 
     def open_threads(self, role: str | None = None, kinds: list[str] | None = None,
@@ -339,6 +421,13 @@ def fold(events: list[dict]) -> dict[str, dict]:
             t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
                      closed_ts=e["ts"], closed_at=e.get("at"))
     return threads
+
+
+def duplicates(located: list[tuple[str, dict]]) -> tuple[list[str], list[int]]:
+    """(entry ids, event numbers) used more than once, e.g. by two clones whose event files were merged."""
+    ids = Counter(e["id"] for _, e in located if e["type"] == "entry")
+    evs = Counter(e["ev"] for _, e in located)
+    return sorted(i for i, n in ids.items() if n > 1), sorted(v for v, n in evs.items() if n > 1)
 
 
 def normalise_id(entry_id: str) -> str:

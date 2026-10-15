@@ -107,8 +107,21 @@ def config_file(root: Path) -> Path:
     return root / (SANDBOX_NAME if (root / SANDBOX_NAME).exists() else CONFIG_NAME)
 
 
+def write_atomic(path: Path, text: str) -> None:
+    """Write via a temporary file and a rename, so a reader never sees half a file."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
 def load(root: Path) -> dict:
-    raw = json.loads(config_file(root).read_text())
+    path = config_file(root)
+    try:
+        raw = json.loads(path.read_text())
+    except ValueError as e:
+        raise ConfigError(f"{path}: not valid JSON ({e}); fix it by hand") from None
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{path} must contain a JSON object")
     cfg = {**DEFAULTS, **raw}
     cfg["kinds"] = {**raw.get("kinds", DEFAULTS["kinds"])}
     return cfg
@@ -117,4 +130,4 @@ def load(root: Path) -> dict:
 def save(root: Path, cfg: dict) -> None:
     (root / BATON_DIR).mkdir(parents=True, exist_ok=True)
     path = root / (SANDBOX_NAME if cfg.get("sandbox") else CONFIG_NAME)
-    path.write_text(json.dumps(cfg, indent=2) + "\n")
+    write_atomic(path, json.dumps(cfg, indent=2) + "\n")

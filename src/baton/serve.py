@@ -228,8 +228,8 @@ def run(board: Board, host: str = "127.0.0.1", port: int = 8765, open_browser: b
     server = make_server(board, host, port)
     url = f"http://{host}:{server.server_address[1]}/"
     if host not in ("127.0.0.1", "localhost", "::1"):
-        print(f"warning: serving on {host}; anyone who can reach it can read the board")
-    print(f"baton dashboard on {url} (read-only; Ctrl-C to stop)")
+        print(f"warning: serving on {host}; anyone who can reach it can read the board", flush=True)
+    print(f"baton dashboard on {url} (read-only; Ctrl-C to stop)", flush=True)
     if open_browser:
         webbrowser.open(url)
     try:
