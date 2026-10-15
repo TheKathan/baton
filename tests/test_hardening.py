@@ -291,16 +291,20 @@ class FirstRunTest(Base):
     def test_serve_banner_shows_when_piped(self):
         env = {**os.environ, "PYTHONPATH": SRC, "BATON_ROOT": str(self.root)}
         proc = subprocess.Popen([sys.executable, "-m", "baton", "serve", "--port", "0"], stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True, env=env)
+                                stderr=subprocess.PIPE, text=True, env=env)
         watchdog = threading.Timer(20, proc.kill)  # without flush, readline would wait until the kill
         watchdog.start()
         try:
-            self.assertIn("http://127.0.0.1:", proc.stdout.readline())
+            line = proc.stdout.readline()
+            if "http://127.0.0.1:" not in line:
+                proc.kill()
+                self.fail(f"no banner; stdout {line!r}, stderr {proc.stderr.read()!r}")
         finally:
             watchdog.cancel()
             proc.terminate()
             proc.wait(timeout=10)
             proc.stdout.close()
+            proc.stderr.close()
 
 
 if __name__ == "__main__":
