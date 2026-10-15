@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-10-15
+
 ### Changed
 - The README opens with a 17-second recording of a real, unscripted agent (Claude Code) on a baton board: its hand-off is refused while frontend's question is open, it answers and closes the question, and the hand-off goes through without `--force`. It's trimmed, with a caption bar for each step and the account's plan name masked in Claude Code's header; the agent's output is unchanged. `scripts/agent-demo/` records and edits it again. The [commands guide](docs/commands.md) opens with a terminal recording of the same commands, built from `assets/demo.tape` with [VHS](https://github.com/charmbracelet/vhs).
 - The README's *How it works* diagram is a new animation: the agents' exchange as a conversation where every message is a typed entry in the append-only log. backend's hand-off is struck out and kept out of the log while frontend's question is unanswered, next to baton's real refusal and the rule; backend answers and the hand-off goes through. `scripts/animate_how_it_works.py` builds the light and dark versions, and readers who prefer reduced motion see the final frame.

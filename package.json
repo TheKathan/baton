@@ -1,6 +1,6 @@
 {
   "name": "agent-baton",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "A file-based, append-only coordination board for AI agents building software together",
   "private": true,
   "license": "MIT",
