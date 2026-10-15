@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-15
+
 ### Added
 ### Changed
 - A refused hand-off says how to fix it first: `answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"`, then `(or hand off anyway with --force and the reason in the body)`.

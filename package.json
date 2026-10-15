@@ -1,6 +1,6 @@
 {
   "name": "agent-baton",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "description": "A file-based, append-only coordination board for AI agents building software together",
   "license": "MIT",
   "homepage": "https://github.com/TheKathan/baton#readme",
