@@ -27,6 +27,13 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 | `src/baton/render.py` | the generated Markdown views |
 | `src/baton/importer.py` | import of hand-written Markdown boards |
 | `src/baton/cli.py` | commands and argument parsing |
+| `src/baton/schema.py` | the board format version, read-time upgrades and config checks |
+| `src/baton/policies.py` | the project's policies, checked on every new entry |
+| `src/baton/sandbox.py` | sandbox mode: per-task boards, their export and summary, other tasks' contracts |
+| `src/baton/metrics.py` | board health for `baton metrics` and the dashboard |
+| `src/baton/serve.py` | the read-only dashboard (`baton serve`) |
+| `src/baton/mcp.py` | the MCP server and its tools |
+| `src/baton/skill/SKILL.md` | the agent skill that `baton skill` installs |
 | `bin/baton` | a shim that runs from a checkout without installing |
 
 ## Branches and releases
@@ -38,11 +45,13 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 - Don't edit version numbers by hand. `python3 scripts/set_version.py --check` verifies they agree, and a test runs it.
 
 ## What a pull request needs
-Repository rulesets enforce all of these on `main`:
+Repository rulesets require all of these on `main`:
 - an approving review from the code owner (`@TheKathan`, see `.github/CODEOWNERS`), given after your last push; new pushes dismiss earlier approvals;
 - all review threads resolved;
 - every `test` job green and up to date with `main`;
 - a merge commit or a squash merge (no rebase merges; history on `main` is never rewritten).
+
+As the sole maintainer, the code owner can merge his own pull requests without a second review; they still need green tests.
 
 Pull requests from forks run CI only after a maintainer approves the run.
 

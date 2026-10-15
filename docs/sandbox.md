@@ -234,15 +234,7 @@ echo "PR summary: $summary"
 
 How it behaves:
 
-- With an agent that hands off and leaves nothing open, it exits 0, stages `.baton/tasks/LIN-7.jsonl` and leaves the summary in `$TMPDIR`.
-- With an agent that leaves a question open, it prints `baton: 1 question(s)/blocker(s) still open: Q-001` and exits 1 without staging. The exported file is already on disk but untracked, so a later step can still read it.
-- The agent's own changes are not staged. Add them with your own `git add` before you commit.
-
-Decide for yourself what a failing `--strict` means: fail the job, comment on the task, or rerun the agent with the open question in its brief. Drop `--strict` if open questions should not block the PR; `finish` then prints a note and exits 0.
-
-How it behaves:
-
-- With an agent that hands off and leaves nothing open, it exits 0, stages `.baton/tasks/LIN-7.jsonl` and leaves the summary in `$TMPDIR`.
+- With an agent that hands off and leaves nothing open, it exits 0, stages `.baton/tasks/LIN-123.jsonl` and leaves the summary in `$TMPDIR`.
 - With an agent that leaves a question open, it prints `baton: 1 question(s)/blocker(s) still open: Q-001` and exits 1 without staging. The exported file is already on disk but untracked, so a later step can still read it.
 - The agent's own changes are not staged. Add them with your own `git add` before you commit.
 

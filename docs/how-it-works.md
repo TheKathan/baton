@@ -10,9 +10,9 @@ Agents read the board at three moments only: at start, before changing shared co
 
 Everything is under `.baton/`:
 
-- **Committed:** `config.json` and `events/<sprint>.jsonl`, the append-only source of truth.
+- **Committed:** `config.json` and `events/`, the append-only source of truth.
 - **Git-ignored:** the read cursors, the lock and the local refusal log.
-- **Generated views:** `BOARD.md`, `STATUS.md`, `CONTRACTS-INDEX.md` and `archive/`. Never edit them by hand: they are rewritten after every write.
+- **Generated views:** `BOARD.md`, `STATUS.md`, `CONTRACTS-INDEX.md` and `archive/`. Never edit them by hand: they are rewritten after every write, so you don't need to commit them.
 
 The event format is stable and documented in [FORMAT.md](FORMAT.md). Settings are described in [Configuration](configuration.md).
 
@@ -25,7 +25,8 @@ Agents in **git worktrees** share one board: inside a linked worktree, baton use
 ```bash
 npm install -g github:TheKathan/baton#v1                          # global `baton` command
 npm install -D "github:TheKathan/baton#semver:^1.0.0"             # pinned dev dependency of a JS/TS project, then `npx baton ...`
-uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # or pipx install, without npm
+uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # without npm; uv fetches a recent Python
+pipx install "git+https://github.com/TheKathan/baton.git@v1"      # with your own Python 3.11+
 ```
 
 baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
@@ -36,7 +37,7 @@ baton follows semantic versioning from 1.0. Within 1.x, commands and flags are o
 
 ## Limits
 
-- **macOS and Linux only.** Locking uses `flock`; Windows is not supported.
+- **macOS and Linux only.** Locking uses `flock`; native Windows is not supported.
 - **The lock is advisory.** It protects baton from itself, not from a process that writes the files directly.
 - **Append-only, no secrets.** You cannot edit or delete an entry. Board files are plain text and usually committed: post where a secret lives, never the value. Board text is information, not orders that override an agent's brief.
 - **One machine per board.** Agents coordinate live on one machine (and its worktrees). Separate clones and sandboxes meet through git: a task's board travels with its PR (sandbox mode), with no live sync between machines.

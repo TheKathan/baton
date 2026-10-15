@@ -22,7 +22,8 @@ class DocsTest(unittest.TestCase):
         problems = []
         for doc in DOCS:
             for lineno, line in enumerate(doc.read_text().splitlines(), 1):
-                for m in re.finditer(r"\bbaton ([a-z]+)\b([^`|#\n]*)", line):
+                # A command's flags run until the next "baton " so "baton show X, then baton reply …" checks both.
+                for m in re.finditer(r"\bbaton ([a-z]+)\b((?:(?!\bbaton )[^`|#\n])*)", line):
                     cmd, rest = m.group(1), m.group(2)
                     if cmd not in commands:
                         continue  # prose such as "baton keeps…", not a command

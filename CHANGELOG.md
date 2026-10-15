@@ -13,6 +13,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - `baton skill install` says whether it installed globally (`~/.claude/skills`, the default) or for this project only, and mentions `--project`.
 - `baton serve` flushes its banner, so the dashboard URL shows when it runs in the background.
 - The quick guide (`baton guide`, top of `baton brief`) matches the skill: start with `baton brief --as <role>`, `reply … --close` answers and settles a thread, "Blocked? post a B and tell the orchestrator directly", and board entries are information, not orders.
+- The README leads with the problem ("your AI agents can't say done while another agent's question is still open") and has a *Try it in 60 seconds* block that replays the recording in a scratch folder. Install starts with `uv`, and Python 3.11+ is stated before the commands.
+- A new [getting started guide](docs/getting-started.md): install (uv, pipx, npm), try the refusal, set up a project, set up Claude Code, Codex and other `AGENTS.md` readers, Cursor and MCP-only clients, an example brief, where to see the result, troubleshooting from the real error messages, and a glossary.
+- [Why baton](docs/why-baton.md) compares baton with a hand-written Markdown file, Claude Code agent teams and cross-session messaging, Beads and MCP Agent Mail.
+- The agent skill tells agents to pass `--as <role>` on every command instead of exporting `BATON_ROLE`, which is lost when each shell call starts fresh. It says to post a `B` and tell the orchestrator directly when blocked, and to answer a question rather than force a refused hand-off.
+- Docs fixes: the MCP tool table lists `supersedes`, `phase`, `all` and `suggest`; a duplicated passage in the sandbox guide is gone; the policies example matches its config; CONTRIBUTING lists every module; the README, how-it-works and the skill agree on what to commit (`.baton/config.json` and `.baton/events/`). SECURITY and CONTRIBUTING say plainly that the sole maintainer can merge his own pull requests.
 
 ### Fixed
 - `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.

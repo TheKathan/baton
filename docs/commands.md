@@ -4,7 +4,7 @@
 
 **The `baton` command is the primary interface, and agents should prefer it.** It has every option and works in any shell. The [MCP tools](#mcp-tools) run the same commands with the same rules, and exist only for agents that cannot run shell commands.
 
-`baton --help` lists every command, `baton <command> --help` shows its flags, and `baton guide` prints the one-screen guide to paste into an agent's brief. Commands that act as a role take `--as <role>`, or read `BATON_ROLE` (see [Configuration](configuration.md#environment-variables)).
+`baton --help` lists every command, `baton <command> --help` shows its flags, and `baton guide` prints the one-screen guide to paste into an agent's brief. Commands that act as a role take `--as <role>`, or read `BATON_ROLE` (see [Configuration](configuration.md#environment-variables)). Agents should pass `--as` on every command, because many agents start each shell command fresh. New to baton? Start with [Getting started](getting-started.md).
 
 Message bodies come from stdin when you pass `-`, from words on the command line, or from `--body-file FILE`.
 
@@ -13,7 +13,7 @@ Message bodies come from stdin when you pass `-`, from words on the command line
 Agents read the board at three moments only, and never poll:
 
 1. **At start:** `baton brief --as <role> --ids C-206,H-232`, then `baton unread --as <role>`.
-2. **Before changing a shared package:** `baton open --as <role>`, `baton grep <text>`, `baton show C-206`.
+2. **Before changing a shared package:** `baton unread --as <role>`, then `baton open --as <role>`. Use `baton grep <text>` and `baton show C-206` to look things up.
 3. **Before reporting done:** `baton unread --as <role>`.
 
 Read entries by id with `baton show` instead of scanning the board. That keeps an agent's context small.
@@ -151,7 +151,14 @@ baton close --phase S8-A --as orchestrator --reason "S8-A passed QA"
 
 ### `baton handoff`
 
-Posts a hand-off (`H`) and updates your status row. It is refused while a question addressed to you is unanswered, or when the body is over `handoff_max_lines` (20). Nothing is posted in that case.
+Posts a hand-off (`H`) and updates your status row. It is refused while a question addressed to you is unanswered, or when the body is over `handoff_max_lines` (20). Nothing is posted in that case:
+
+```text
+baton: hand-off refused:
+  - unanswered threads addressed to you: Q-001
+  answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"
+  (or hand off anyway with --force and the reason in the body)
+```
 
 | Flag | Meaning |
 |---|---|
@@ -266,6 +273,8 @@ $ baton sprint S2
 archived S1 to .baton/archive/BOARD-S1.md; current sprint is now S2
 ```
 
+When threads are still open, a second line says how many carried over.
+
 The orchestrator closes a phase after its gate passes with `baton close --phase S1-A --as orchestrator`, and a sprint with `baton open --blocking`, then `baton close --sprint S1 --as orchestrator`, then `baton sprint S2`.
 
 ### `baton metrics`
@@ -341,7 +350,7 @@ baton init --sprint S1 --roles orchestrator,backend,frontend,qa
 
 ### `baton skill`
 
-Prints or installs the agent skill (Claude Code format). Actions: `install` (the default), `show`, `path`.
+Prints or installs the agent skill (Claude Code format). Actions: `install` (the default), `show`, `path`. By default `install` writes to `~/.claude/skills/`, for every project on your machine. For other agents, see [Set up your agents](getting-started.md#4-set-up-your-agents).
 
 | Flag | Meaning |
 |---|---|
@@ -424,9 +433,9 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 | `baton_open` | `baton open` | `role`, `all`, `blocking`, `stale` |
 | `baton_grep` | `baton grep` | `text` |
 | `baton_list` | `baton list` | `sprint`, `kind`, `status`, `role` |
-| `baton_post` | `baton post` | `role`, `kind`, `to`, `title`, `body`, `files`, `cites`, `blocks` |
+| `baton_post` | `baton post` | `role`, `kind`, `to`, `title`, `body`, `files`, `cites`, `blocks`, `supersedes` |
 | `baton_reply` | `baton reply` | `role`, `id`, `body`, `close` |
-| `baton_close` | `baton close` | `role`, `ids`, `reason`, `sprint` |
+| `baton_close` | `baton close` | `role`, `ids`, `reason`, `sprint`, `phase` |
 | `baton_handoff` | `baton handoff` | `role`, `phase`, `state`, `to`, `title`, `body`, `files`, `cites`, `closes`, `force` |
 | `baton_status` | `baton status` | `role`, `phase`, `state` (set your row when `state` is given) |
 | `baton_sandbox_start` | `baton init --sandbox --task` | `task`, `roles`, `force` |
@@ -434,7 +443,7 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 | `baton_finish` | `baton finish` | `strict` |
 | `baton_sprint` | `baton sprint` | `name` |
 | `baton_metrics` | `baton metrics` | `sprint`, `stale` |
-| `baton_lint` | `baton lint` | none |
+| `baton_lint` | `baton lint` | `all`, `suggest` |
 
 `baton_post` offers the entry kinds from your config, without `H`. Tools return the command's output as text, with `isError` set when the command failed.
 

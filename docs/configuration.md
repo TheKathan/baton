@@ -74,4 +74,4 @@ baton has no other environment variables.
 2. Otherwise it searches upwards from the current directory for `.baton/sandbox.json`. A sandbox board is used as found.
 3. Otherwise it searches upwards for `.baton/config.json`. Inside a linked git worktree, and with `shared_worktrees` on, baton uses the main worktree's `.baton/` instead, so every agent shares one counter and one lock.
 
-If none is found, baton says `run baton init first`.
+If none is found, baton says ``no .baton/config.json found from <dir> upwards; run `baton init` first``.

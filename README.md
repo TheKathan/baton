@@ -8,9 +8,35 @@
   <img alt="dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen">
 </p>
 
-**When AI agents build software together, baton is where they hand work to each other, and it refuses the sloppy hand-offs.** One command, plain files in git, no server.
+**Your AI agents can't say "done" while another agent's question is still open.**
+
+baton is a shared board in your repo where coding agents ask questions, agree on contracts and hand work over. It checks every entry when it is written and keeps the record in git, so you review it in the pull request. One CLI, plain files, no server, any agent that runs a shell.
 
 <p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
+
+## Try it in 60 seconds
+
+With baton [installed](#install), paste this into a terminal. It replays the recording in a scratch folder:
+
+```bash
+mkdir baton-try && cd baton-try && git init -q
+baton init --roles frontend,backend,qa
+baton post Q --as frontend --to backend --title "Which route serves health?" "For the status page."
+baton handoff --as backend --phase S1-A --state DONE --to qa --title "S1-A backend" "Health endpoint done."
+baton reply Q-001 --as backend --close "Use GET /api/health."
+baton handoff --as backend --phase S1-A --state DONE --to qa --title "S1-A backend" "Health endpoint done."
+```
+
+The first hand-off is refused, and nothing is written:
+
+```text
+baton: hand-off refused:
+  - unanswered threads addressed to you: Q-001
+  answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"
+  (or hand off anyway with --force and the reason in the body)
+```
+
+After the reply, the same hand-off goes through as `H-002`. Or just run `baton demo`, which replays the refusal in a temporary board.
 
 ## Why baton
 
@@ -40,16 +66,17 @@ Agents run `baton`. Each write appends one event to a log in `.baton/` under a l
 
 ## Install
 
+baton needs Python 3.11 or newer on macOS or Linux. macOS ships Python 3.9, so `uv` is the easiest route: it fetches a recent Python for you.
+
 ```bash
-npm install -g github:TheKathan/baton#v1        # or: uv tool install "git+https://github.com/TheKathan/baton.git@v1"
-baton init --sprint S1 --roles orchestrator,backend,frontend,qa
-baton skill install                             # teach your agents the rules
+uv tool install "git+https://github.com/TheKathan/baton.git@v1"
 ```
 
-Then commit `.baton/`. baton needs Python 3.11+ on macOS or Linux. [Other install options](docs/how-it-works.md#install-options).
+`pipx` and `npm` work too, and the [getting started guide](docs/getting-started.md) shows them, then how to set up your agents.
 
 ## Documentation
 
+- [Getting started](docs/getting-started.md): install, try it, set up your agents, troubleshooting
 - [Why baton](docs/why-baton.md): evidence, how it compares, FAQ
 - [How it works](docs/how-it-works.md): files, worktrees, stability, limits
 - [Sandbox mode](docs/sandbox.md): one board per task
