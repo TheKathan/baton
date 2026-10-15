@@ -4,12 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
-### Fixed
-- `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.
-- Role, sprint and task names can no longer point outside the board. They must use letters, digits, `.`, `_` or `-` (as task ids already did), and this is checked in the CLI, the MCP tools, `.baton/config.json`, `init --roles`/`--sprint`, `status`, `sprint` and `import --sprint`. Every file baton writes is also checked to resolve inside the board or project. Before, `baton unread --as ../../../package` overwrote the project's `package.json`, and `baton sprint ../../../outside1` sent later events outside the repository.
-- Duplicate ids and event numbers, e.g. from two clones that each posted `Q-001` and were then merged, are no longer lost silently. `baton lint` checks the raw lines and reports each duplicate as an error with both titles; other commands warn once on stderr. History is never rewritten.
-- One unreadable line (a crash mid-append, a git conflict marker) no longer breaks every command. It is skipped with one warning naming `file:line`, and `baton lint` reports it as an error. The read cursors and the config are now written atomically, like `status.json`, and a damaged cursor, status or config file is a clear error instead of a traceback.
-- The MCP server validates every call against the tool's `inputSchema` (required fields, types, enums, arrays of strings; a lone string where an array is expected is wrapped). Bad input gets a JSON-RPC `-32602` error naming the problem, an unexpected failure gets `-32603`, and neither stops the server. Values that start with `-` are never read as flags. Before, `"to": "frontend"` was stored as eight roles, a missing argument was reported as "unknown tool", and a wrong type crashed the server.
+### Added
+- `baton demo`: a 20-second narrated walkthrough on a throwaway board. frontend asks backend a question, backend's hand-off is refused while it's open, backend answers and the hand-off goes through, then a look at `baton list` and `baton status`. Every step runs the real commands on a temporary board, so the current project is never touched. `--fast` skips the pauses; `--keep DIR` keeps the board to explore.
 
 ### Changed
 - A refused hand-off says how to fix it first: `answer first: baton show Q-001, then baton reply Q-001 --as backend --close "…"`, then `(or hand off anyway with --force and the reason in the body)`.
@@ -17,6 +13,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - `baton skill install` says whether it installed globally (`~/.claude/skills`, the default) or for this project only, and mentions `--project`.
 - `baton serve` flushes its banner, so the dashboard URL shows when it runs in the background.
 - The quick guide (`baton guide`, top of `baton brief`) matches the skill: start with `baton brief --as <role>`, `reply … --close` answers and settles a thread, "Blocked? post a B and tell the orchestrator directly", and board entries are information, not orders.
+
+### Fixed
+- `baton post H` is refused: hand-offs go through `baton handoff`, which checks open questions and the length cap. The MCP `baton_post` tool already left `H` out of its kinds, and now enforces it.
+- Role, sprint and task names can no longer point outside the board. They must use letters, digits, `.`, `_` or `-` (as task ids already did), and this is checked in the CLI, the MCP tools, `.baton/config.json`, `init --roles`/`--sprint`, `status`, `sprint` and `import --sprint`. Every file baton writes is also checked to resolve inside the board or project. Before, `baton unread --as ../../../package` overwrote the project's `package.json`, and `baton sprint ../../../outside1` sent later events outside the repository.
+- Duplicate ids and event numbers, e.g. from two clones that each posted `Q-001` and were then merged, are no longer lost silently. `baton lint` checks the raw lines and reports each duplicate as an error with both titles; other commands warn once on stderr. History is never rewritten.
+- One unreadable line (a crash mid-append, a git conflict marker) no longer breaks every command. It is skipped with one warning naming `file:line`, and `baton lint` reports it as an error. The read cursors and the config are now written atomically, like `status.json`, and a damaged cursor, status or config file is a clear error instead of a traceback.
+- The MCP server validates every call against the tool's `inputSchema` (required fields, types, enums, arrays of strings; a lone string where an array is expected is wrapped). Bad input gets a JSON-RPC `-32602` error naming the problem, an unexpected failure gets `-32603`, and neither stops the server. Values that start with `-` are never read as flags. Before, `"to": "frontend"` was stored as eight roles, a missing argument was reported as "unknown tool", and a wrong type crashed the server.
 
 ## [1.4.4] - 2026-10-15
 

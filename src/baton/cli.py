@@ -720,6 +720,11 @@ def cmd_contracts(args) -> None:
     print(f"{len(own)} live contract(s) on this board, {len(rows)} from other tasks")
 
 
+def cmd_demo(args) -> None:
+    from . import demo
+    demo.run(fast=args.fast, keep=args.keep)
+
+
 def cmd_where(args) -> None:
     root, worktree = config.locate()
     board = Board(root, config.load(root))
@@ -884,6 +889,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("contracts", cmd_contracts, "live contracts: this board's and other tasks' exported boards")
     sp.add_argument("--paths", help="only contracts touching these globs, e.g. 'modules/network/**'")
+
+    sp = add("demo", cmd_demo, "a 20-second walkthrough on a throwaway board: a refused hand-off, then a clean one")
+    sp.add_argument("--fast", action="store_true", help="no pauses (for tests and CI)")
+    sp.add_argument("--keep", metavar="DIR", help="build the demo board in DIR (no .baton there yet) and keep it")
 
     add("where", cmd_where, "print the project root and config")
     add("guide", lambda a: print(GUIDE), "print the agent quick guide")

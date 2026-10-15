@@ -388,6 +388,20 @@ baton import old-board.md --sprint S0 --dry-run
 
 Reports the board's on-disk format and records the current one in the config. `--check` only reports. Event files are never rewritten. See the [board format](FORMAT.md).
 
+### `baton demo`
+
+A 20-second narrated walkthrough on a throwaway board, for a first look with no agents and no setup: frontend asks backend a question, backend's hand-off is refused, backend answers and the hand-off goes through, then `baton list` and `baton status`. Every step runs the real commands on a temporary board; your project and its `.baton/` are never touched.
+
+| Flag | Meaning |
+|---|---|
+| `--fast` | No pauses, for tests and CI. |
+| `--keep DIR` | Build the board in `DIR` (which must not have a `.baton/` yet) and keep it to explore. |
+
+```bash
+baton demo
+baton demo --keep /tmp/baton-demo
+```
+
 ### `baton where`
 
 Prints the project root and the config in use as JSON. Inside a linked git worktree it shows `shared_from_worktree` too.
@@ -424,4 +438,4 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 
 `baton_post` offers the entry kinds from your config, without `H`. Tools return the command's output as text, with `isError` set when the command failed.
 
-There is no MCP tool for `init` (without `--sandbox`), `render`, `import`, `skill`, `migrate`, `stats`, `serve`, `report` or `where`. Run those with the command.
+There is no MCP tool for `init` (without `--sandbox`), `render`, `import`, `skill`, `migrate`, `stats`, `serve`, `report`, `demo` or `where`. Run those with the command.
