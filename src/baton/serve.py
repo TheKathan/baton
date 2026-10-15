@@ -223,8 +223,6 @@ def make_handler(board: Board):
 
 class _Server(ThreadingHTTPServer):
     def server_bind(self):
-        # HTTPServer.server_bind looks the host up with socket.getfqdn, which can stall for
-        # tens of seconds on some machines; the dashboard only needs the address it was given.
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = str(self.server_address[0]), self.server_address[1]
 

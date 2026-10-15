@@ -33,9 +33,8 @@ from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
 
 ALL = "all"
 LOCAL_DIR = ".local"  # per-checkout data under the board dir, never committed
-# Roles, sprints and task ids become file names, so they are kept to a safe set of characters.
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-_warned: set[str] = set()  # stderr warnings already printed by this command
+_warned: set[str] = set()
 
 
 class BoardError(Exception):
@@ -86,7 +85,7 @@ class Board:
         self.dir = root / cfg["dir"]
         self.cursors = self.dir / ".cursors"
         self.last_warnings: list[str] = []
-        self.warn = True  # warn on stderr about unreadable lines and duplicate ids (lint reports them itself)
+        self.warn = True
         try:
             policies.validate(cfg.get("policies"))
         except policies.PolicyError as e:

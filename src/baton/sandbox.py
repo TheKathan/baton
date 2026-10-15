@@ -21,7 +21,7 @@ from pathlib import Path
 from . import config
 from .store import NAME_RE, Board, BoardError, fold
 
-TASK_RE = NAME_RE  # task ids name files, like roles and sprints
+TASK_RE = NAME_RE
 LOCAL_PATHS = (f"/{config.SANDBOX_NAME}", f"/{config.BATON_DIR}/sandbox/")
 # Team settings a sandbox board takes from the project's committed .baton/config.json.
 INHERITED = ("policies", "kinds", "handoff_max_lines", "body_warn_lines", "unread_warn_tokens", "id_width")
@@ -92,7 +92,7 @@ def init(root: Path, task: str, roles: list[str], force: bool = False) -> str:
         for e in events:
             board.append_raw({k: v for k, v in e.items() if k != "ev"})
         resumed = len(events)
-        roles_seen = roles or sorted({e["from"] for e in events  # all, when unrestricted
+        roles_seen = roles or sorted({e["from"] for e in events
                                       if isinstance(e.get("from"), str) and NAME_RE.match(e["from"])})
         for role in roles_seen:  # the history was read by the previous sandbox: start at the tip
             board.unread(role)

@@ -64,9 +64,8 @@ class ReleaseTest(unittest.TestCase):
                                   capture_output=True, text=True, check=True)
             info = json.loads(pack.stdout)[0]
             pkg = json.loads((ROOT / "package.json").read_text())
-            self.assertNotIn("private", pkg)  # publishable to npm; the release workflow decides when
+            self.assertNotIn("private", pkg)
             self.assertEqual(pkg["name"], "agent-baton")
-            # `npx agent-baton` runs the bin named after the package
             self.assertEqual(pkg["bin"], {"baton": "bin/baton", "agent-baton": "bin/baton"})
             files = {f["path"] for f in info["files"]}
             self.assertIn("bin/baton", files)
@@ -92,10 +91,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(meta["name"], "agent-baton")
         self.assertEqual(meta["requires-python"], ">=3.11")
         self.assertEqual(meta["dependencies"], [])
-        # `uvx agent-baton` / `pipx run agent-baton` need a command named after the package
         self.assertEqual(meta["scripts"], {"baton": "baton.cli:main", "agent-baton": "baton.cli:main"})
         self.assertIn("Development Status :: 4 - Beta", meta["classifiers"])
-        # PyPI renders the README without the repository, so its images need absolute URLs
         readme = (ROOT / "README.md").read_text()
         self.assertEqual(re.findall(r'(?:src|srcset)="(?!https?:)([^"]+)"', readme), [])
 
@@ -114,10 +111,10 @@ class LauncherTest(unittest.TestCase):
             env.pop("BATON_LAUNCHER_REEXEC", None)
             r = subprocess.run([str(ROOT / "bin" / "baton"), "--version"], env=env, capture_output=True,
                                text=True, check=False)
-            if r.returncode:  # no python3.11+ on that PATH
+            if r.returncode:
                 self.assertIn("baton needs Python 3.11 or newer", r.stderr)
                 self.assertIn("uvx agent-baton", r.stderr)
-            (Path(tmp) / "python3.13").symlink_to(sys.executable)  # a newer one is used instead
+            (Path(tmp) / "python3.13").symlink_to(sys.executable)
             r = subprocess.run([str(ROOT / "bin" / "baton"), "--version"], env=env, capture_output=True,
                                text=True, check=True)
             self.assertTrue(r.stdout.startswith("baton "), r.stdout + r.stderr)
@@ -152,7 +149,6 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertIn('git push origin "refs/tags/$VERSION"', release)
         self.assertIn('git push --force origin "refs/tags/$MAJOR"', release)
         self.assertNotRegex(release, r"--force[^\n]*\$VERSION|-f \"?\$VERSION")
-        # trunk-semver pushes the tag it computes, so it runs against a local sandbox remote
         self.assertLess(release.index("tag-sandbox.git"), release.index("TheKathan/trunk-semver@"))
         self.assertLess(release.index("TheKathan/trunk-semver@"), release.index('set-url origin "$ORIGIN_URL"'))
 

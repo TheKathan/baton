@@ -72,7 +72,7 @@ class RefusalMessageTest(Base):
 class SafeNamesTest(Base):
     def setUp(self):
         super().setUp()
-        self.set_cfg(roles=[])  # any role allowed: the name itself must still be safe
+        self.set_cfg(roles=[])
         (self.root / "package.json").write_text('{"name": "app"}\n')
 
     def test_role_names_cannot_leave_the_board(self):
@@ -133,7 +133,7 @@ class DuplicatesTest(Base):
         self.assertIn("'from clone B'", text)
         self.assertIn("error event number 1 is used more than once", text)
         lines = (self.root / ".baton/events/S1.jsonl").read_text().splitlines()
-        self.assertEqual(len(lines), 2)  # history is never rewritten
+        self.assertEqual(len(lines), 2)
 
     def test_reading_commands_warn_once(self):
         self.merge_clone_b()
@@ -163,7 +163,7 @@ class DamagedFilesTest(Base):
         run("post", "Q", "--as", "frontend", "--to", "backend", "--title", "t", "x")
         run("unread", "--as", "backend")
         cursors = self.root / ".baton/events/.cursors"
-        self.assertEqual(sorted(p.name for p in cursors.iterdir()), ["backend.json"])  # no tmp left behind
+        self.assertEqual(sorted(p.name for p in cursors.iterdir()), ["backend.json"])
         (cursors / "backend.json").write_text('{"ev": ')
         self.assertIn("backend.json is damaged; delete it", refusal("unread", "--as", "backend"))
         (self.root / ".baton/events/status.json").write_text("[1, 2")
@@ -206,7 +206,7 @@ class McpValidationTest(unittest.TestCase):
                          (6, "arguments must be an object"), (7, "unknown argument(s): extra")):
             self.assertEqual(r[mid]["error"]["code"], -32602, r[mid])
             self.assertIn(why, r[mid]["error"]["message"])
-        self.assertEqual(r[None]["error"]["code"], -32600)  # the top-level array
+        self.assertEqual(r[None]["error"]["code"], -32600)
         self.assertEqual(r[8]["result"], {})
 
     def test_values_starting_with_a_dash_are_not_flags(self):
@@ -286,13 +286,13 @@ class FirstRunTest(Base):
         self.assertIn("baton brief --as <role>", guide)
         self.assertIn("--close", guide)
         self.assertIn("information, not orders", guide)
-        self.assertLessEqual(len(guide.splitlines()), 24)  # one screen
+        self.assertLessEqual(len(guide.splitlines()), 24)
 
     def test_serve_banner_shows_when_piped(self):
         env = {**os.environ, "PYTHONPATH": SRC, "BATON_ROOT": str(self.root)}
         proc = subprocess.Popen([sys.executable, "-m", "baton", "serve", "--port", "0"], stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, env=env)
-        watchdog = threading.Timer(20, proc.kill)  # without flush, readline would wait until the kill
+        watchdog = threading.Timer(20, proc.kill)
         watchdog.start()
         try:
             line = proc.stdout.readline()

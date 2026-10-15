@@ -308,7 +308,7 @@ def serve(stdin=None, stdout=None) -> None:
         else:
             try:
                 reply = handle(msg)
-            except Exception as e:  # noqa: BLE001 - one bad call must never stop the server
+            except Exception as e:  # noqa: BLE001
                 mid = msg.get("id") if isinstance(msg, dict) else None
                 reply = _error(mid, INTERNAL_ERROR, f"internal error: {type(e).__name__}: {e}")
         if reply is not None:

@@ -22,7 +22,7 @@ from .store import BoardError
 ROLES = "frontend,backend,qa"
 HANDOFF = ["handoff", "--as", "backend", "--phase", "S1-A", "--state", "DONE", "--to", "qa",
            "--title", "S1-A backend", "Health endpoint done."]
-STEPS = [  # (narration, argv, pause after)
+STEPS = [
     ("a fresh board for three agents", ["init", "--roles", ROLES], 0.6),
     ("frontend asks backend a question",
      ["post", "Q", "--as", "frontend", "--to", "backend", "--title", "Which route serves health?",
@@ -96,9 +96,9 @@ def _play(root: Path, fast: bool, out) -> None:
             out.write(f"{s.dim}# {note}{s.reset}\n")
             pause(0.3)
             typed(shlex.join(["baton", *argv]))
-            if argv[0] == "init":  # init takes its root as a flag, never the current directory
+            if argv[0] == "init":
                 ok, text = _call([*argv, "--root", str(root)])
-                text = text.replace(str(root) + os.sep, "").splitlines()[0]  # its next-step hints come at the end
+                text = text.replace(str(root) + os.sep, "").splitlines()[0]
             else:
                 ok, text = _call(argv)
             colour = s.green if ok and argv[0] in ("handoff", "reply") else (s.red if not ok else "")

@@ -5,21 +5,9 @@ name: release
 #   feature/* or feat/*  -> minor (0.1.0 -> 0.2.0)
 #   anything else        -> patch (0.1.0 -> 0.1.1)
 #   release/X.Y.Z        -> exactly vX.Y.Z (for a new major such as 1.0.0, which bumps can't reach)
-# The version is written into the files (bot commit), the exact tag vX.Y.Z is created once
-# on that commit (never moved), the major tag (v1) is moved onto it, and a GitHub release is
-# published from CHANGELOG.md.
-#
-# Jobs:
-#   test     runs the suite with a read-only token and no deploy key
-#   release  versions, tags and publishes the GitHub release
-#   build    builds the sdist and wheel from the tag          (only if vars.PUBLISH_PYPI == 'true')
-#   pypi     uploads them to PyPI through Trusted Publishing  (only if vars.PUBLISH_PYPI == 'true')
-#   npm      publishes agent-baton to npm with provenance     (only if vars.PUBLISH_NPM == 'true')
-# The registry setup is described in docs/publishing.md.
-#
 # Pushes (the version commit and the tags) go through a deploy key, the only actor the
 # rulesets on main and on v* tags let through without a PR. The key lives in the
-# "release" environment, which only main may use; only the release job loads it.
+# "release" environment, which only main may use.
 
 on:
   push:
@@ -29,7 +17,7 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions: {}   # each job asks for what it needs
+permissions: {}
 
 jobs:
   test:
@@ -59,8 +47,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: write       # gh release create
-      pull-requests: read   # trunk-semver looks up the merged PR's source branch
+      contents: write
+      pull-requests: read
     outputs:
       version: ${{ steps.exact.outputs.version || steps.version.outputs.version }}
     steps:
@@ -89,10 +77,6 @@ jobs:
             echo "Exact release $v from $src" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # trunk-semver tags the commit it runs on and pushes the tag. That commit is the merge,
-      # not the version commit, so letting it push would mean force-moving vX.Y.Z afterwards.
-      # Point origin at a local mirror while it runs: it still computes the version, and the
-      # tags it pushes stay on the runner.
       - name: Keep trunk-semver's tags in a local sandbox
         if: steps.exact.outputs.version == ''
         run: |
@@ -119,7 +103,6 @@ jobs:
         run: |
           set -euo pipefail
           MAJOR="${VERSION%%.*}"
-          # exact version tags are created once and never moved
           remote_tag=$(git ls-remote --tags origin "refs/tags/$VERSION")
           if [[ -n "$remote_tag" ]]; then
             echo "::error::tag $VERSION already exists on GitHub; exact version tags are never moved"; exit 1
@@ -134,11 +117,11 @@ jobs:
             git commit -am "chore(release): $VERSION"
             git push origin HEAD:main
           fi
-          git tag -d "$VERSION" >/dev/null 2>&1 || true   # trunk-semver's sandbox tag on the merge commit
+          git tag -d "$VERSION" >/dev/null 2>&1 || true
           git tag "$VERSION"
           git tag -f "$MAJOR"
-          git push origin "refs/tags/$VERSION"           # a new tag: no force
-          git push --force origin "refs/tags/$MAJOR"     # only the major tag moves
+          git push origin "refs/tags/$VERSION"
+          git push --force origin "refs/tags/$MAJOR"
 
       - name: Publish the GitHub release
         env:
@@ -187,9 +170,6 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # PyPI Trusted Publishing: pypi.org trusts TheKathan/baton, release.yml and the "pypi"
-  # environment, so no PyPI token is stored. Only this job can mint the OIDC token, and it
-  # runs no code from the repository.
   pypi:
     needs: [release, build]
     if: vars.PUBLISH_PYPI == 'true'
@@ -210,9 +190,6 @@ jobs:
         with:
           skip-existing: true
 
-  # npm with provenance. With trusted publishing (npmjs.com trusts TheKathan/baton,
-  # release.yml and the "npm" environment) no token is needed; until that is set up, an
-  # NPM_TOKEN secret in the "npm" environment is used. Skips a version already on npm.
   npm:
     needs: release
     if: vars.PUBLISH_NPM == 'true'
@@ -222,7 +199,7 @@ jobs:
       url: https://www.npmjs.com/package/agent-baton
     permissions:
       contents: read
-      id-token: write     # npm trusted publishing and provenance
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,7 +218,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/set_version.py --check
-          npm install -g npm@11.9.0   # trusted publishing needs npm >= 11.5.1
+          npm install -g npm@11.9.0
           if npm view "agent-baton@${VERSION#v}" version >/dev/null 2>&1; then
             echo "agent-baton@${VERSION#v} is already on npm"
             exit 0

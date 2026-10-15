@@ -398,7 +398,7 @@ def _lint_raw(board: Board) -> list[str]:
 
 def cmd_lint(args) -> None:
     board = _board(args)
-    board.warn = False  # lint lists unreadable lines and duplicates as errors itself
+    board.warn = False
     threads = board.entries()
     if args.suggest:
         _lint_suggest(board, threads)

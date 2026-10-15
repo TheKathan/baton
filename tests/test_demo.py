@@ -33,7 +33,7 @@ class DemoTest(unittest.TestCase):
         self.assertIn("posted H-002", out)
         self.assertIn("$ baton list", out)
         self.assertIn("baton skill install", out)
-        self.assertNotIn("\033[", out)  # not a terminal: no colours
+        self.assertNotIn("\033[", out)
         self.assertEqual(list(self.here.iterdir()), [])
         self.assertNotIn("BATON_ROOT", os.environ)
 
