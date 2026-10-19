@@ -165,8 +165,8 @@ class McpTest(unittest.TestCase):
         data = json.loads(path.read_text())
         self.assertEqual(data["mcpServers"]["baton"], {"command": "baton", "args": ["mcp"]})
         self.assertEqual(data["mcpServers"]["other"], {"command": "x"})
-        run("mcp", "install", "--command", "npx", "--file", str(self.root / "alt.json"))
-        self.assertEqual(json.loads((self.root / "alt.json").read_text())["mcpServers"]["baton"]["command"], "npx")
+        run("mcp", "install", "--command", "/opt/tools/baton", "--file", str(self.root / "alt.json"))
+        self.assertEqual(json.loads((self.root / "alt.json").read_text())["mcpServers"]["baton"]["command"], "/opt/tools/baton")
 
 
 if __name__ == "__main__":

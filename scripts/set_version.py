@@ -4,22 +4,19 @@
   scripts/set_version.py 0.2.0          update the files and the changelog
   scripts/set_version.py --check        exit 1 if the files disagree
 
-Files: src/baton/__init__.py (the source of truth at runtime), package.json, the README
-version badge, and
+Files: src/baton/__init__.py (the source of truth at runtime), the README version badge, and
 CHANGELOG.md (the "Unreleased" section becomes "[X.Y.Z] - <date>"). pyproject.toml
 reads the version from src/baton/__init__.py, so it needs no edit.
 Used by .github/workflows/release.yml after trunk-semver picks the version.
 """
 
 import datetime
-import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INIT = ROOT / "src/baton/__init__.py"
-PKG = ROOT / "package.json"
 CHANGELOG = ROOT / "CHANGELOG.md"
 README = ROOT / "README.md"
 BADGE = re.compile(r'<img alt="Version ([^"]+)" src="https://img\.shields\.io/badge/version-([^-]+)-blue">')
@@ -28,7 +25,7 @@ SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
 def current() -> dict[str, str]:
     init = re.search(r'__version__ = "([^"]+)"', INIT.read_text()).group(1)
-    found = {"src/baton/__init__.py": init, "package.json": json.loads(PKG.read_text())["version"]}
+    found = {"src/baton/__init__.py": init}
     if README.exists() and (m := BADGE.search(README.read_text())):
         found["README.md badge"] = m.group(2)
     return found
@@ -36,9 +33,6 @@ def current() -> dict[str, str]:
 
 def set_version(version: str) -> None:
     INIT.write_text(re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', INIT.read_text()))
-    pkg = json.loads(PKG.read_text())
-    pkg["version"] = version
-    PKG.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
     if README.exists():
         README.write_text(BADGE.sub(
             f'<img alt="Version {version}" src="https://img.shields.io/badge/version-{version}-blue">',

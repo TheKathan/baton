@@ -1,5 +1,4 @@
 import ast
-import json
 import os
 import re
 import shutil
@@ -36,7 +35,7 @@ class ReleaseTest(unittest.TestCase):
     def test_set_version_updates_files_and_changelog(self):
         with tempfile.TemporaryDirectory() as tmp:
             t = Path(tmp)
-            for rel in ("scripts/set_version.py", "src/baton/__init__.py", "package.json"):
+            for rel in ("scripts/set_version.py", "src/baton/__init__.py"):
                 (t / rel).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(ROOT / rel, t / rel)
             (t / "CHANGELOG.md").write_text("# Changelog\n\n## [Unreleased]\n\n### Added\n- thing\n\n## [0.1.0] - 2026-10-07\n- first\n")
@@ -45,7 +44,6 @@ class ReleaseTest(unittest.TestCase):
             script = t / "scripts/set_version.py"
             subprocess.run([sys.executable, str(script), "v0.2.0"], check=True, capture_output=True)
             self.assertIn('__version__ = "0.2.0"', (t / "src/baton/__init__.py").read_text())
-            self.assertEqual(json.loads((t / "package.json").read_text())["version"], "0.2.0")
             self.assertIn("badge/version-0.2.0-blue", (t / "README.md").read_text())
             log = (t / "CHANGELOG.md").read_text()
             self.assertRegex(log, r"## \[Unreleased\]\n\n## \[0\.2\.0\] - \d{4}-\d{2}-\d{2}\n\n### Added\n- thing")
@@ -56,49 +54,20 @@ class ReleaseTest(unittest.TestCase):
             subprocess.run([sys.executable, str(script), "0.2.0"], check=True, capture_output=True)
             self.assertEqual((t / "CHANGELOG.md").read_text().count("## [0.2.0]"), 1)
 
-    @unittest.skipUnless(shutil.which("npm"), "npm not installed")
-    def test_npm_pack_installs_a_working_baton_command(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            env = {**os.environ, "npm_config_cache": str(Path(tmp) / "cache"), "npm_config_update_notifier": "false"}
-            pack = subprocess.run(["npm", "pack", "--json", "--pack-destination", tmp], cwd=ROOT, env=env,
-                                  capture_output=True, text=True, check=True)
-            info = json.loads(pack.stdout)[0]
-            pkg = json.loads((ROOT / "package.json").read_text())
-            self.assertNotIn("private", pkg)
-            self.assertEqual(pkg["name"], "agent-baton")
-            self.assertEqual(pkg["bin"], {"baton": "bin/baton", "agent-baton": "bin/baton"})
-            files = {f["path"] for f in info["files"]}
-            self.assertIn("bin/baton", files)
-            self.assertIn("src/baton/cli.py", files)
-            self.assertIn("src/baton/skill/SKILL.md", files)
-            self.assertFalse(any(p.startswith(("tests/", "assets/", ".github/")) for p in files), files)
-            prefix = Path(tmp) / "prefix"
-            subprocess.run(["npm", "install", "-g", "--prefix", str(prefix), str(Path(tmp) / info["filename"])],
-                           env=env, capture_output=True, text=True, check=True)
-            out = subprocess.run([str(prefix / "bin" / "baton"), "--version"], capture_output=True, text=True,
-                                 check=True).stdout
-            self.assertEqual(out.strip(), f"baton {info['version']}")
-            skill = subprocess.run([str(prefix / "bin" / "baton"), "skill", "show"], capture_output=True,
-                                   text=True, check=True).stdout
-            self.assertTrue(skill.startswith("---\nname: baton\n"))
-            out = subprocess.run([str(prefix / "bin" / "agent-baton"), "--version"], capture_output=True,
-                                 text=True, check=True).stdout
-            self.assertEqual(out.strip(), f"baton {info['version']}")
-
     def test_pyproject_metadata(self):
         text = (ROOT / "pyproject.toml").read_text()
         meta = tomllib.loads(text)["project"]
-        self.assertEqual(meta["name"], "agent-baton")
+        self.assertEqual(meta["name"], "baton-handoff")
         self.assertEqual(meta["requires-python"], ">=3.11")
         self.assertEqual(meta["dependencies"], [])
-        self.assertEqual(meta["scripts"], {"baton": "baton.cli:main", "agent-baton": "baton.cli:main"})
+        self.assertEqual(meta["scripts"], {"baton": "baton.cli:main", "baton-handoff": "baton.cli:main"})
         self.assertIn("Development Status :: 4 - Beta", meta["classifiers"])
         readme = (ROOT / "README.md").read_text()
         self.assertEqual(re.findall(r'(?:src|srcset)="(?!https?:)([^"]+)"', readme), [])
 
 
 class LauncherTest(unittest.TestCase):
-    """bin/baton is what `npx agent-baton` runs, often with an old system python3."""
+    """bin/baton runs baton from a checkout (install.sh's fallback), often with an old system python3."""
 
     def test_launcher_parses_on_old_pythons(self):
         ast.parse((ROOT / "bin" / "baton").read_text(), feature_version=(3, 6))
@@ -113,7 +82,7 @@ class LauncherTest(unittest.TestCase):
                                text=True, check=False)
             if r.returncode:
                 self.assertIn("baton needs Python 3.11 or newer", r.stderr)
-                self.assertIn("uvx agent-baton", r.stderr)
+                self.assertIn("uvx baton-handoff", r.stderr)
             (Path(tmp) / "python3.13").symlink_to(sys.executable)
             r = subprocess.run([str(ROOT / "bin" / "baton"), "--version"], env=env, capture_output=True,
                                text=True, check=True)
@@ -154,16 +123,13 @@ class ReleaseWorkflowTest(unittest.TestCase):
 
     def test_registry_publishing_is_off_by_default_and_least_privileged(self):
         self.assertIn("permissions: {}", self.workflow)
-        gates = {"build": "vars.PUBLISH_PYPI == 'true'", "pypi": "vars.PUBLISH_PYPI == 'true'",
-                 "npm": "vars.PUBLISH_NPM == 'true'"}
-        for name, gate in gates.items():
-            self.assertIn(f"if: {gate}", self.jobs[name], name)
+        for name in ("build", "pypi"):
+            self.assertIn("if: vars.PUBLISH_PYPI == 'true'", self.jobs[name], name)
         for name, job in self.jobs.items():
-            self.assertEqual("id-token: write" in job, name in ("pypi", "npm"), name)
+            self.assertEqual("id-token: write" in job, name == "pypi", name)
         self.assertIn("name: pypi", self.jobs["pypi"])
         self.assertIn("pypa/gh-action-pypi-publish@", self.jobs["pypi"])
-        self.assertIn("name: npm", self.jobs["npm"])
-        self.assertIn("npm publish --provenance --access public", self.jobs["npm"])
+        self.assertEqual(sorted(self.jobs), ["build", "pypi", "release", "test"])
 
 
 if __name__ == "__main__":

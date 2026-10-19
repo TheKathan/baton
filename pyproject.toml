@@ -1,5 +1,5 @@
 [project]
-name = "agent-baton"
+name = "baton-handoff"
 dynamic = ["version"]
 description = "A file-based, append-only coordination board for AI agents building software together"
 readme = "README.md"
@@ -34,8 +34,7 @@ Changelog = "https://github.com/TheKathan/baton/blob/main/CHANGELOG.md"
 
 [project.scripts]
 baton = "baton.cli:main"
-# `uvx agent-baton` and `pipx run agent-baton` look for a command named after the package
-agent-baton = "baton.cli:main"
+baton-handoff = "baton.cli:main"
 
 [build-system]
 requires = ["setuptools>=77"]

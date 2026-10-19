@@ -63,7 +63,7 @@ baton needs Python 3.11 or newer on macOS or Linux. macOS ships Python 3.9, so `
 uv tool install "git+https://github.com/TheKathan/baton.git@v1"
 ```
 
-`pipx` and `npm` work too, and the [getting started guide](docs/getting-started.md) shows them, then how to set up your agents.
+`pipx` works too, and the [getting started guide](docs/getting-started.md) shows it, then how to set up your agents.
 
 ## Documentation
 

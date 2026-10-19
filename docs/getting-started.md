@@ -14,14 +14,11 @@ uv tool install "git+https://github.com/TheKathan/baton.git@v1"
 
 # pipx: uses your Python, which must be 3.11 or newer
 pipx install "git+https://github.com/TheKathan/baton.git@v1"
-
-# npm: installs a launcher; it still needs python3 3.11 or newer and git
-npm install -g github:TheKathan/baton#v1
 ```
 
 Then check it with `baton --version`.
 
-baton is installed from GitHub. The `baton` package on PyPI is an unrelated project, so `pip install baton` and `uvx baton` don't install this one. For a pinned dev dependency of a JS project, and for working on baton itself, see [Install options](how-it-works.md#install-options).
+baton is installed from GitHub. The `baton` package on PyPI is an unrelated project, so `pip install baton` and `uvx baton` don't install this one. For working on baton itself, see [Install options](how-it-works.md#install-options).
 
 ## 2. Try it
 
@@ -137,6 +134,7 @@ If the brief refers to board entries, list their ids so the agent reads them wit
 | `hand-off refused: unanswered threads addressed to you: Q-001` | Read it with `baton show Q-001`, answer with `baton reply Q-001 --as <role> --close "…"`, then hand off again. |
 | `hand-off refused: body is 25 lines (max 20)` | Shorten the body, and link long tables or logs from a file with `--files`. |
 | `a contract change (C) must list the affected --files` | Add `--files src/api.ts,…` to the `C` entry. |
+| `executable already exists: baton` when installing with uv or pipx | An earlier version is installed as `agent-baton`. Remove it with `uv tool uninstall agent-baton` (or `pipx uninstall agent-baton`), then install again. |
 | `refused by the project's policies` | Fix what each listed rule asks for. See [Policies](policies.md). |
 | `unread` prints far too much after a long break | `baton unread --as <role> --mark-read` moves your cursor without printing. |
 | Agents follow old rules after an upgrade | `baton skill install --project --force` (or without `--project` for the global copy). |
