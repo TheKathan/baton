@@ -1,6 +1,12 @@
-# The README's agent demo
+# The README's agent demos
 
-`assets/agent-demo.gif` is a real, unscripted Claude Code (Sonnet) session on a baton board, trimmed and captioned. The agent plays backend and gets no baton skill: its brief only names the hand-off command, and baton's refusal tells it what to do.
+`assets/agent-demo.gif`, the README hero, is two real agents from different vendors on one board: Codex (frontend) asks a question, and Claude Code (backend) is refused, answers and hands off. `assets/agent-demo-claude.gif`, used in the getting-started guide, is one Claude Code agent. Neither agent gets the baton skill or a hint about refusals: their briefs only name the command to run.
+
+## Two vendors (`duo/`)
+
+Needs tmux, VHS, ffmpeg, Python 3 with numpy and Pillow, and logged-in Codex and Claude Code. From `duo/`: `vhs tape.tape` writes `raw.gif`; extract its frames, run `mask.py` to hide Claude Code's plan name, re-encode, then add the caption bar with `edit/` as below. `codex-frontend.sh` lets Codex read only the scratch project and baton's install.
+
+## One agent
 
 Needs [VHS](https://github.com/charmbracelet/vhs), ffmpeg, Python 3 with Pillow, a logged-in Claude Code, and baton linked at `/opt/homebrew/bin/baton` (so no home path shows on screen).
 

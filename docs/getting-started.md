@@ -50,6 +50,10 @@ $ baton unread --as qa
 
 Message bodies can be words on the command line (as here), `-` to read stdin, or `--body-file FILE`. `baton demo` replays the same refusal in a temporary board, if you'd rather not type.
 
+This is what it looks like when a real agent hits the refusal on its own: Claude Code, given only the hand-off command, reads the open question, answers it and hands off without `--force`.
+
+<p align="center"><img alt="A real Claude Code agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 is unanswered; it answers and closes Q-001, and the hand-off goes through as H-002 without --force" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/agent-demo-claude.gif" width="800"></p>
+
 ## 3. Set up your project
 
 In your repository:

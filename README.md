@@ -14,7 +14,7 @@ baton is a shared board in your repo where coding agents ask questions, agree on
 
 **Try it in one command:** `uvx baton-handoff demo`
 
-<p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
+<p align="center"><img alt="Two real coding agents from different vendors share one baton board. Codex, as frontend, asks backend which route serves the health check (Q-001). Claude Code, as backend, runs baton handoff and is refused because Q-001 is unanswered; it reads the question, answers and closes it, and the hand-off goes through as H-002 without --force. A live board along the bottom shows each entry as it is written. Captioned; the agents' output is unchanged" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/agent-demo.gif" width="800"><br><sub>Two real agents, unscripted: Codex asks, Claude Code is refused until it answers, and the live board records it all.</sub></p>
 
 ## Try it in 60 seconds
 
