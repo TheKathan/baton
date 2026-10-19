@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The PyPI package is named **`baton-handoff`**: `agent-baton` is too close to an existing `agentbaton` project, so PyPI refuses it. The command it installs is still `baton`. If you installed an earlier version with uv or pipx, remove the old tool first: `uv tool uninstall agent-baton` or `pipx uninstall agent-baton`.
+
+### Removed
+- npm: `package.json`, npm publishing and the npm install instructions. baton is published on PyPI only; `install.sh` still links `bin/baton` when neither uv nor pipx is installed.
+
 ## [1.5.0] - 2026-10-15
 
 ### Added

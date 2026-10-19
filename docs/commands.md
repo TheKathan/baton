@@ -368,11 +368,11 @@ Runs the MCP server on stdio (`serve`, the default), or registers it in `.mcp.js
 
 | Flag | Meaning |
 |---|---|
-| `--command CMD` | The command MCP clients run. Default `baton`. Use `npx` for a dev dependency. |
+| `--command CMD` | The command MCP clients run. Default `baton`. Give a full path when `baton` isn't on the client's `PATH`. |
 | `--file FILE` | The `.mcp.json` to update. Default: the project's. |
 
 ```bash
-baton mcp install --command npx
+baton mcp install --command ~/.local/bin/baton
 ```
 
 ### `baton render`

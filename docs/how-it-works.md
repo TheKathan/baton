@@ -23,13 +23,11 @@ Agents in **git worktrees** share one board: inside a linked worktree, baton use
 ## Install options
 
 ```bash
-npm install -g github:TheKathan/baton#v1                          # global `baton` command
-npm install -D "github:TheKathan/baton#semver:^1.0.0"             # pinned dev dependency of a JS/TS project, then `npx baton ...`
-uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # without npm; uv fetches a recent Python
+uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # uv fetches a recent Python
 pipx install "git+https://github.com/TheKathan/baton.git@v1"      # with your own Python 3.11+
 ```
 
-baton needs `python3` 3.11 or newer on macOS or Linux; the npm install only adds a launcher. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
+baton needs `python3` 3.11 or newer on macOS or Linux. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
 
 ## Stability
 
