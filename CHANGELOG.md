@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- Install from PyPI: `uv tool install baton-handoff` (or `pipx install baton-handoff`), and try it without installing with `uvx baton-handoff demo`. This is the first release published to PyPI.
+
 ## [1.5.1] - 2026-10-19
 
 ### Changed

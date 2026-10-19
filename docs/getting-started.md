@@ -10,15 +10,15 @@ Pick one:
 
 ```bash
 # uv (recommended): it downloads a recent Python if yours is too old
-uv tool install "git+https://github.com/TheKathan/baton.git@v1"
+uv tool install baton-handoff
 
 # pipx: uses your Python, which must be 3.11 or newer
-pipx install "git+https://github.com/TheKathan/baton.git@v1"
+pipx install baton-handoff
 ```
 
 Then check it with `baton --version`.
 
-baton is installed from GitHub. The `baton` package on PyPI is an unrelated project, so `pip install baton` and `uvx baton` don't install this one. For working on baton itself, see [Install options](how-it-works.md#install-options).
+The package is called `baton-handoff` on PyPI, and the command it installs is `baton`. The PyPI package named `baton` is an unrelated project, so `pip install baton` installs something else. To try baton without installing it, run `uvx baton-handoff demo`. For the latest unreleased version or for working on baton itself, see [Install options](how-it-works.md#install-options).
 
 ## 2. Try it
 
@@ -138,7 +138,7 @@ If the brief refers to board entries, list their ids so the agent reads them wit
 | `refused by the project's policies` | Fix what each listed rule asks for. See [Policies](policies.md). |
 | `unread` prints far too much after a long break | `baton unread --as <role> --mark-read` moves your cursor without printing. |
 | Agents follow old rules after an upgrade | `baton skill install --project --force` (or without `--project` for the global copy). |
-| `pip install baton` installed something else | That's a different package. Use one of the install commands above. |
+| `pip install baton` installed something else | That's a different package. baton is `baton-handoff`: `uv tool install baton-handoff`. |
 
 ## Glossary
 

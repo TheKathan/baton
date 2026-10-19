@@ -23,8 +23,10 @@ Agents in **git worktrees** share one board: inside a linked worktree, baton use
 ## Install options
 
 ```bash
-uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # uv fetches a recent Python
-pipx install "git+https://github.com/TheKathan/baton.git@v1"      # with your own Python 3.11+
+uv tool install baton-handoff                                     # uv fetches a recent Python
+pipx install baton-handoff                                        # with your own Python 3.11+
+uvx baton-handoff demo                                            # try it without installing
+uv tool install "git+https://github.com/TheKathan/baton.git@v1"   # the latest 1.x straight from GitHub
 ```
 
 baton needs `python3` 3.11 or newer on macOS or Linux. `v1` always points to the latest `1.x` release. To work on baton itself: `git clone https://github.com/TheKathan/baton.git && cd baton && make install`.
