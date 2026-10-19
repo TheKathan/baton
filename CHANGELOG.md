@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- The README hero shows two real agents from different vendors on one board: Codex asks a question, Claude Code's hand-off is refused until it answers, and a live board records each entry. The single-agent recording moves to the [getting started guide](docs/getting-started.md). `scripts/agent-demo/duo/` records the new one.
+
 ## [1.5.3] - 2026-10-19
 
 ### Changed
