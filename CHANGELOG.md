@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-10-19
+
 ### Changed
 - The README opens with a one-command try (`uvx baton-handoff demo`) and a PyPI version badge, and the PyPI summary leads with what baton prevents.
 
