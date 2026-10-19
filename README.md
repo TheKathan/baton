@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/TheKathan/baton/actions/workflows/test.yml"><img alt="tests" src="https://github.com/TheKathan/baton/actions/workflows/test.yml/badge.svg"></a>
-  <img alt="latest release" src="https://img.shields.io/github/v/release/TheKathan/baton">
+  <a href="https://pypi.org/project/baton-handoff/"><img alt="PyPI" src="https://img.shields.io/pypi/v/baton-handoff"></a>
   <img alt="license" src="https://img.shields.io/github/license/TheKathan/baton">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-%E2%89%A5%203.11-3776AB">
   <img alt="dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen">
@@ -11,6 +11,8 @@
 **Your AI agents can't say "done" while another agent's question is still open.**
 
 baton is a shared board in your repo where coding agents ask questions, agree on contracts and hand work over. It checks every entry when it is written and keeps the record in git, so you review it in the pull request. One CLI, plain files, no server, any agent that runs a shell.
+
+**Try it in one command:** `uvx baton-handoff demo`
 
 <p align="center"><img alt="A real coding agent, acting as backend, runs baton handoff and is refused because frontend's question Q-001 (which route serves the health check?) is unanswered; it reads the refusal, answers and closes Q-001, and the hand-off goes through as H-002 without --force. Trimmed and captioned; the agent's output is unchanged" src="https://raw.githubusercontent.com/TheKathan/baton/main/assets/agent-demo.gif" width="800"><br><sub>A real agent (Claude Code), unscripted, trimmed and captioned: refused while a question is open, it answers and hands off.</sub></p>
 

@@ -1,13 +1,13 @@
 [project]
 name = "baton-handoff"
 dynamic = ["version"]
-description = "A file-based, append-only coordination board for AI agents building software together"
+description = "Your AI coding agents can't say done while another agent's question is open: a hand-off board in git, checked at write time"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Gonçalo Faria" }]
-keywords = ["ai-agents", "coordination", "multi-agent", "handoff", "cli", "mcp", "claude-code"]
+keywords = ["ai-agents", "coding-agents", "coordination", "multi-agent", "handoff", "agent-handoff", "cli", "mcp", "claude-code", "codex", "cursor"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",
