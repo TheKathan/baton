@@ -27,7 +27,7 @@ baton reply Q-001 --as backend --close "Use GET /api/health."
 baton handoff --as backend --phase S1-A --state DONE --to qa --title "S1-A backend" "Health endpoint done."
 ```
 
-The first hand-off is refused (`answer first: baton show Q-001, then baton reply …`) and nothing is written; after the reply it goes through as `H-002`. Or just run `baton demo` for a narrated replay on a temporary board.
+The first hand-off is refused (`answer first: baton show Q-001, then baton reply …`) and nothing is written; after the reply it goes through as `H-002`. Or just run `baton demo` for a narrated replay on a temporary board; without installing anything, `uvx baton-handoff demo`.
 
 ## Why baton
 
@@ -57,13 +57,13 @@ Agents run `baton`. Each write appends one event to a log in `.baton/` under a l
 
 ## Install
 
-baton needs Python 3.11 or newer on macOS or Linux. macOS ships Python 3.9, so `uv` is the easiest route: it fetches a recent Python for you.
+baton is on PyPI as `baton-handoff` and installs the `baton` command. It needs Python 3.11 or newer on macOS or Linux; macOS ships Python 3.9, so `uv` is the easiest route: it fetches a recent Python for you.
 
 ```bash
-uv tool install "git+https://github.com/TheKathan/baton.git@v1"
+uv tool install baton-handoff
 ```
 
-`pipx` works too, and the [getting started guide](docs/getting-started.md) shows it, then how to set up your agents.
+`pipx install baton-handoff` works too, and the [getting started guide](docs/getting-started.md) shows it, then how to set up your agents.
 
 ## Documentation
 
