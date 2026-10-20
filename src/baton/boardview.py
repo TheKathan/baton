@@ -379,7 +379,7 @@ def runners(m: Model) -> str:
         row = m.status.get(role) or {"phase": "", "state": "no status row"}
         state, phase = row.get("state", ""), row.get("phase", "")
         away = not m.sandbox and not m.in_sprint(phase)
-        tone = ("bad" if re.match(r"(NEEDS|BLOCK|FAIL)", state, re.I) else "ok" if state.upper().startswith("DONE")
+        tone = ("bad" if re.match(r"(NEEDS|BLOCK|FAIL)", state, re.IGNORECASE) else "ok" if state.upper().startswith("DONE")
                 else "warn" if "wait" in state.lower() else "")
         tags = ""
         hold = m.holders.get(role, [])
@@ -444,7 +444,7 @@ def card(m: Model, t: dict, col: str, mini: bool = False) -> str:
 
 def progress_card(m: Model, p: dict) -> str:
     row, t = p["row"], p["thread"]
-    tone = "bad" if re.match(r"(NEEDS|BLOCK|FAIL)", row["state"], re.I) else ""
+    tone = "bad" if re.match(r"(NEEDS|BLOCK|FAIL)", row["state"], re.IGNORECASE) else ""
     tag = f'<span class="ph">{esc(row["phase"])}</span>' if m.show_phase and row.get("phase") else ""
     updated = metrics.parse_ts(row.get("updated"))
     return (f'<a class="card prog k-{t["kind"]}" href="/e/{esc(t["id"])}" '
