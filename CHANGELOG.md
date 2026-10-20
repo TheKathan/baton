@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- `baton serve` shows the board as a kanban. Each question, blocker and hand-off sits in one column that says its state: Blocked, Needs an answer, Answered (close it), To pick up, In progress, Passed on, Done. A card names who must act next, and a question card shows which agent's hand-off it is locking. The role cards stay above the board, decisions and contracts are records beside it, and the metrics tables moved to `/metrics`.
+
+### Added
+- `/contracts` in `baton serve` lists the live contracts by file area, and a card is flagged "touches C-x" when open work changes a file under a contract. In a sandbox it includes the contracts of merged tasks.
+
 ## [1.5.4] - 2026-10-19
 
 ### Changed

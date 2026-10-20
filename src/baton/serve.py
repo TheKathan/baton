@@ -1,8 +1,10 @@
 """`baton serve`: a read-only local dashboard of the board (standard library only).
 
 Routes (GET only; anything else gets 405):
-  /                 the dashboard: blockers, questions waiting, open threads by age, status, metrics
-  /e/<id>           one entry with its replies
+  /                 the board: a kanban of the work, who holds the baton, decisions and recent activity
+  /contracts        live contracts by file area (?f=all|new|old|touched)
+  /metrics          board health: answer and close times, stale threads, per-sprint and per-role load
+  /e/<id>           one entry with its replies (a sandbox's other tasks: /e/<task>/<id>)
   /api/board.json   open threads and the status table
   /api/metrics.json the same numbers as `baton metrics --json`
 The board is re-read on every request, and the page refreshes itself every 30 s.
@@ -10,16 +12,16 @@ The board is re-read on every request, and the page refreshes itself every 30 s.
 
 from __future__ import annotations
 
-import html
 import json
 import socketserver
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
-from . import __version__, metrics, render
-from .store import Board, BoardError
+from . import __version__, boardview, metrics, render, sandbox
+from .boardview import esc
+from .store import Board, BoardError, normalise_id
 
 CSS = """
 :root{--bg:#f6f8fa;--panel:#fff;--text:#1f2328;--muted:#59636e;--line:#d0d7de;--accent:#c2410c;
@@ -49,10 +51,6 @@ footer{margin-top:28px;color:var(--muted);font-size:12px}
 """
 
 
-def esc(value) -> str:
-    return html.escape(str(value), quote=True)
-
-
 def _age(hours) -> str:
     if hours is None:
         return "—"
@@ -67,16 +65,6 @@ def _table(headers: list[str], rows: list[list[str]], empty: str) -> str:
     return f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
-def _link(t: dict) -> str:
-    return f'<a class="id" href="/e/{esc(t["id"])}">{esc(t["id"])}</a>'
-
-
-def _thread_row(t: dict, now: datetime) -> list[str]:
-    title = t["title"] or render.first_line(t["body"])
-    return [_link(t), f'<span class="kind">{esc(t["kind"])}</span>', esc(t["from"]), esc(", ".join(t["to"])),
-            esc(title), esc(_age(metrics.age_hours(t, now))), esc(t["sprint"])]
-
-
 def page(title: str, body: str) -> str:
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
             f'content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30">'
@@ -84,18 +72,12 @@ def page(title: str, body: str) -> str:
             f'<footer>baton {esc(__version__)} · read-only · refreshes every 30 s</footer></main></body></html>')
 
 
-def dashboard(board: Board) -> str:
+def metrics_page(board: Board) -> str:
     now = datetime.now()
     m = metrics.compute(board, now=now)
     s = m["summary"]
-    threads = board.entries()
-    open_ = sorted((t for t in threads.values() if t["status"] == "OPEN"),
-                   key=lambda t: -(metrics.age_hours(t, now) or 0))
+    open_ = [t for t in board.entries().values() if t["status"] == "OPEN"]
     blockers = [t for t in open_ if t["kind"] == "B" or t.get("blocks")]
-    contracts = [t for t in open_ if t["kind"] == "C"]
-    moving = [t for t in open_ if t["kind"] != "C"]
-    waiting = [(t, r) for t in open_ if t["kind"] in ("Q", "B") and not metrics.first_answer(t)
-               for r in t["to"] if r != "all"]
     cards = [
         ("Open threads", s["open"], ""), ("Blockers", len(blockers), "bad" if blockers else "ok"),
         ("Unanswered Q/B", s["unanswered_open"], "warn" if s["unanswered_open"] else "ok"),
@@ -106,8 +88,6 @@ def dashboard(board: Board) -> str:
     ]
     cards_html = "".join(f'<div class="card {c}"><div class="n">{esc(v)}</div><div class="l">{esc(lbl)}</div></div>'
                          for lbl, v, c in cards)
-    th = ["Id", "Kind", "From", "To", "Title", "Idle", "Sprint"]
-    status = board.status()
     def stat(x):
         return (f'{x["median"]}h', f'p90 {x["p90"]}h · n={x["n"]}') if x["n"] else ("—", "no data yet")
     fa, cl = stat(s["hours_to_first_answer"]), stat(s["hours_to_close"])
@@ -141,30 +121,29 @@ def dashboard(board: Board) -> str:
                   esc(f'{x["unread"]} (~{x["unread_tokens"]})')]
                  for r, x in m["roles"].items()]
     body = f"""
-<header><h1><b>baton</b> · {esc(board.root.name)}</h1>
+<header><h1><a class="id" href="/">baton</a> · {esc(board.root.name)} · metrics</h1>
 <span class="muted">sprint <code>{esc(board.cfg["sprint"])}</code> · {esc(m["generated"])}</span></header>
 <div class="cards">{cards_html}</div>
-<h2>Blockers</h2>{_table(th, [_thread_row(t, now) for t in blockers], "No open blockers.")}
-<h2>Questions waiting for an answer</h2>{_table(["Waiting on", *th],
-    [[esc(r), *_thread_row(t, now)] for t, r in waiting], "Nobody is waiting for an answer.")}
-<h2>Open threads, longest idle first</h2>{_table(th, [_thread_row(t, now) for t in moving], "Nothing open.")}
-<details><summary>Live contracts ({len(contracts)})</summary>{_table(th, [_thread_row(t, now) for t in contracts],
-    "No live contracts.")}</details>
-<h2>Status</h2>{_table(["Role", "Phase", "State", "Last hand-off", "Updated"],
-    [[esc(r), f'<span class="nw">{esc(x["phase"])}</span>', esc(x["state"]),
-      f'<span class="nw">{esc(x["handoff"] or "—")}</span>', f'<span class="nw">{esc(x["updated"])}</span>']
-     for r, x in sorted(status.items())], "No status rows yet.")}
-<h2>Metrics</h2><div class="cards">{health_html}</div>
-<h2>Metrics by sprint</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer",
-                                   "Median close", "Stale", "~Tokens"], sprint_rows, "No sprints yet.")}
-<h2>Metrics by role</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on",
-                                 "Open owned", "Unread (~tokens)"], role_rows, "No roles yet.")}
+<h2>Board health</h2><div class="cards">{health_html}</div>
+<h2>By sprint</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer",
+                            "Median close", "Stale", "~Tokens"], sprint_rows, "No sprints yet.")}
+<h2>By role</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on",
+                         "Open owned", "Unread (~tokens)"], role_rows, "No roles yet.")}
 """
-    return page(f"baton · {board.root.name}", body)
+    return page(f"metrics · {board.root.name}", body)
 
 
 def entry_page(board: Board, entry_id: str) -> str:
-    t = board.get(entry_id)
+    if "/" in entry_id:  # a sandbox's other tasks: <task>/<id>
+        task, _, key = entry_id.partition("/")
+        threads = sandbox.other_tasks(board.root, board.cfg.get("task", "")).get(task, {})
+        key = normalise_id(key)
+        kind, _, num = key.partition("-")
+        t = threads.get(key) or (threads.get(board.format_id(kind, int(num))) if num.isdigit() else None)
+        if t is None:
+            raise BoardError(f"no entry {entry_id}")
+    else:
+        t = board.get(entry_id)
     return page(f"{t['id']} · baton", f'<header><h1><a class="id" href="/">baton</a> · {esc(t["id"])}</h1>'
                 f'<span class="muted">{esc(t["status"])} · {esc(t["sprint"])}</span></header>'
                 f"<pre>{esc(render.entry_md(t))}</pre>")
@@ -198,10 +177,15 @@ def make_handler(board: Board):
             self.wfile.write(data)
 
         def do_GET(self):
-            path = unquote(self.path.split("?", 1)[0])
+            url = urlsplit(self.path)
+            path = unquote(url.path)
             try:
                 if path == "/":
-                    return self._send(200, dashboard(board))
+                    return self._send(200, boardview.board_page(board))
+                if path == "/contracts":
+                    return self._send(200, boardview.contracts_page(board, parse_qs(url.query).get("f", ["all"])[0]))
+                if path == "/metrics":
+                    return self._send(200, metrics_page(board))
                 if path == "/api/metrics.json":
                     return self._send(200, json.dumps(metrics.compute(board), indent=2), "application/json")
                 if path == "/api/board.json":
