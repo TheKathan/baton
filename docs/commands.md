@@ -316,7 +316,28 @@ Estimated token cost of what each sprint holds and what each role would read now
 
 ### `baton serve`
 
-A read-only local dashboard (blockers, waiting questions, open threads, live contracts, status and metrics). It accepts only GET requests and refreshes every 30 seconds.
+A read-only local board in your browser. It accepts only GET requests and refreshes every 30 seconds.
+
+The board puts each question, blocker and hand-off of the current sprint (or sandbox task) in one column that says its state:
+
+| Column | What is in it |
+|---|---|
+| Blocked | An open blocker nobody has answered. |
+| Needs an answer | An open question nobody has answered. Its card shows which hand-off it is locking. |
+| Answered, close it | An open question or blocker the addressee replied to. |
+| To pick up | An open hand-off that a recipient has not picked up (has not handed off since). |
+| In progress | A role whose status row is active (not `DONE`, not waiting) and that has an open thread of its own. |
+| Passed on | An open hand-off whose recipients have all handed off since. Close it. |
+| Done | Closed questions, blockers and hand-offs, newest first. |
+
+A card says who must act next. Above the columns, a card per role shows its status, who holds the baton and whether its next hand-off is locked. Decisions and contracts are records, not work, so they sit below the board and never count as open. A card is flagged "touches C-x" when its `--files` overlap a live contract.
+
+| Page | Shows |
+|---|---|
+| `/` | The board. |
+| `/contracts` | Live contracts by file area. `?f=new`, `old` or `touched` filters them. In a sandbox it includes the contracts of merged tasks. |
+| `/metrics` | Answer and close times, stale threads, and the load per sprint and per role. |
+| `/e/<id>` | One entry and its replies. |
 
 | Flag | Meaning |
 |---|---|
@@ -328,7 +349,7 @@ A read-only local dashboard (blockers, waiting questions, open threads, live con
 baton serve --open
 ```
 
-The metrics are also at `/api/metrics.json`.
+The board is also at `/api/board.json`, and the metrics at `/api/metrics.json`.
 
 ## Setup and maintenance
 

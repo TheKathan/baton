@@ -126,7 +126,7 @@ If the brief refers to board entries, list their ids so the agent reads them wit
 - `.baton/BOARD.md`: the current sprint's entries with their replies and status, readable in your editor.
 - `.baton/STATUS.md` or `baton status`: one row per role that has handed off.
 - `baton open --blocking`: what is blocking someone right now.
-- `baton serve --open`: a read-only dashboard in your browser, with blockers, waiting questions and metrics.
+- `baton serve --open`: a read-only kanban board in your browser: what is blocked, who has the baton and what is waiting for an answer.
 
 ## Troubleshooting
 
