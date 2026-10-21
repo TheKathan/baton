@@ -120,11 +120,22 @@ def metrics_page(board: Board) -> str:
                   esc(metrics._short(x["hours_to_answer"])), esc(x["waiting_on"]), esc(x["open_owned"]),
                   esc(f'{x["unread"]} (~{x["unread_tokens"]})')]
                  for r, x in m["roles"].items()]
+    flow_rows = [[esc(r), esc(x["handoffs_sent"]), esc(x["accepted"]), esc(x["rework"]), esc(x["bounced"]),
+                  esc(metrics._short(x["hours_held"])), esc(metrics._short(x["hours_to_pickup"])),
+                  esc(x["refused"]), esc(x["forced"]),
+                  esc(", ".join(f"{k} {v}" for k, v in sorted(x["models"].items(), key=lambda kv: -kv[1])) or "—")]
+                 for r, x in m["roles"].items()]
+    model_rows = [[esc(k), esc(x["events"]), esc(x["handoffs"]), esc(x["accepted"]), esc(x["rework"])]
+                  for k, x in sorted(m["models"].items(), key=lambda kv: -kv[1]["events"])]
     body = f"""
 <header><h1><a class="id" href="/">baton</a> · {esc(board.root.name)} · metrics</h1>
 <span class="muted">sprint <code>{esc(board.cfg["sprint"])}</code> · {esc(m["generated"])}</span></header>
 <div class="cards">{cards_html}</div>
 <h2>Board health</h2><div class="cards">{health_html}</div>
+<h2>Hand-offs by role</h2>{_table(["Role", "Sent", "Accepted", "Rework", "Bounced", "Median hold", "Median pickup",
+                                    "Refused", "Forced", "Models"], flow_rows, "No hand-offs yet.")}
+<h2>By model</h2>{_table(["Model", "Events", "Hand-offs", "Accepted", "Rework"], model_rows,
+                         "No events yet.")}
 <h2>By sprint</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer",
                             "Median close", "Stale", "~Tokens"], sprint_rows, "No sprints yet.")}
 <h2>By role</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on",
@@ -146,7 +157,21 @@ def entry_page(board: Board, entry_id: str) -> str:
         t = board.get(entry_id)
     return page(f"{t['id']} · baton", f'<header><h1><a class="id" href="/">baton</a> · {esc(t["id"])}</h1>'
                 f'<span class="muted">{esc(t["status"])} · {esc(t["sprint"])}</span></header>'
-                f"<pre>{esc(render.entry_md(t))}</pre>")
+                f"<pre>{esc(render.entry_md(t))}</pre>{_written_by(t)}")
+
+
+def _written_by(t: dict) -> str:
+    """Who wrote each part of a thread, with the model when one was recorded."""
+    def line(role: str, what: str, e: dict) -> str:
+        model = f' with <code>{esc(e["model"])}</code> <span class="muted">({esc(e.get("model_src", ""))})</span>' \
+            if e.get("model") else ""
+        return f"<li>{esc(what)} by {esc(role)}{model}</li>"
+    rows = [line(t["from"], "posted", t)] + [line(r["from"], "replied", r) for r in t["replies"]]
+    if t["closed_by"]:
+        outcome = f' ({esc(t["closed_outcome"])})' if t.get("closed_outcome") else ""
+        rows.append(f'<li>closed{outcome} by {esc(t["closed_by"])}'
+                    + (f' with <code>{esc(t["closed_model"])}</code>' if t.get("closed_model") else "") + "</li>")
+    return f'<h2>Written by</h2><ul class="muted">{"".join(rows)}</ul>'
 
 
 def board_json(board: Board) -> dict:

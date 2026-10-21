@@ -4,6 +4,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- Agent behaviour in `baton metrics` and the `/metrics` page: per role, the hand-offs sent, how receivers judged them, bounce-backs, median hold and pickup time, and refused and forced hand-offs; and the same by model. The board's role cards show a quiet one-line summary.
+- Every entry, reply and close records the `model` that wrote it: from `--model`, `$BATON_MODEL`, or detected from the running Claude Code or Codex session (`BATON_MODEL_DETECT=0` turns detection off). A hand-off stores its `--state`, and `baton close --outcome accepted|rework` lets the receiver judge a hand-off; `handoff --closes` records `accepted`. All are optional fields, so existing boards read unchanged.
+
 ## [1.6.0] - 2026-10-20
 
 ### Changed

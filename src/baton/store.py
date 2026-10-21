@@ -27,11 +27,12 @@ from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
 
-from . import policies
+from . import agentmodel, policies
 from .config import write_atomic
 from .schema import SCHEMA_VERSION, FormatError, check_config, upgrade
 
 ALL = "all"
+OUTCOMES = ("accepted", "rework")
 LOCAL_DIR = ".local"  # per-checkout data under the board dir, never committed
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _warned: set[str] = set()
@@ -86,6 +87,8 @@ class Board:
         self.cursors = self.dir / ".cursors"
         self.last_warnings: list[str] = []
         self.warn = True
+        self.model_flag: str | None = None  # set by a command that writes; None means events carry no model
+        self._who: dict | None = None
         try:
             policies.validate(cfg.get("policies"))
         except policies.PolicyError as e:
@@ -158,6 +161,12 @@ class Board:
         out.sort(key=lambda e: e["ev"])
         return out
 
+    def who_wrote(self) -> dict:
+        """The model fields to add to the next event (see agentmodel); resolved once per Board."""
+        if self.model_flag is not None and self._who is None:
+            self._who = agentmodel.resolve(self.model_flag)
+        return self._who or {}
+
     def _append(self, event: dict, stamp: bool = True) -> dict:
         """Caller must hold the lock. Assigns ev, sprint and ts (and the exact UTC `at` if stamp)."""
         evs = self.events()
@@ -169,6 +178,8 @@ class Board:
         event.setdefault("ts", now())
         if stamp:
             event.setdefault("at", utc_now())
+            for key, value in self.who_wrote().items():
+                event.setdefault(key, value)
         path = inside(self.dir / f"{event['sprint']}.jsonl", self.dir)
         with path.open("a") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
@@ -271,7 +282,7 @@ class Board:
 
     def post(self, kind: str, author: str, to: list[str], title: str, body: str,
              files: list[str] = (), cites: list[str] = (), blocks: list[str] = (),
-             phase: str = "", supersedes: list[str] = ()) -> dict:
+             phase: str = "", supersedes: list[str] = (), state: str = "") -> dict:
         kind = kind.upper()
         if kind not in self.cfg["kinds"]:
             raise BoardError(f"unknown kind {kind!r}; known: {', '.join(self.cfg['kinds'])}")
@@ -289,6 +300,8 @@ class Board:
                  "cites": list(cites), "blocks": list(blocks)}
         if phase:
             entry["phase"] = phase
+        if state:
+            entry["state"] = state.strip()
         if supersedes:
             entry["supersedes"] = list(supersedes)
         refusals, self.last_warnings = policies.check(self.cfg.get("policies"), entry)
@@ -309,13 +322,20 @@ class Board:
             t = self.get(entry_id)
             return self._append({"type": "reply", "id": t["id"], "from": author, "body": body.strip()})
 
-    def close(self, entry_id: str, author: str, reason: str = "") -> dict:
+    def close(self, entry_id: str, author: str, reason: str = "", outcome: str = "") -> dict:
         self._check_role(author)
+        if outcome and outcome not in OUTCOMES:
+            raise BoardError(f"unknown outcome {outcome!r}; use {' or '.join(OUTCOMES)}")
         with self.lock():
             t = self.get(entry_id)
             if t["status"] == "CLOSED":
                 raise BoardError(f"{t['id']} is already closed by {t['closed_by']}")
-            return self._append({"type": "close", "id": t["id"], "from": author, "reason": reason.strip()})
+            if outcome and t["kind"] != "H":
+                raise BoardError(f"--outcome judges a hand-off (H); {t['id']} is a {t['kind']}")
+            event = {"type": "close", "id": t["id"], "from": author, "reason": reason.strip()}
+            if outcome:
+                event["outcome"] = outcome
+            return self._append(event)
 
     def append_raw(self, event: dict) -> dict:
         """Used by the importer: keeps the given id/n/ts/sprint and adds no `at`."""
@@ -407,6 +427,7 @@ def fold(events: list[dict]) -> dict[str, dict]:
             t = {k: v for k, v in e.items() if k != "type"}
             t.setdefault("status", "OPEN")
             t.update(replies=[], closed_by=None, closed_reason=None, closed_ts=None, closed_at=None,
+                     closed_outcome=None, closed_model=None,
                      last_ts=e["ts"], last_at=e.get("at"))
             threads[e["id"]] = t
     for e in events:
@@ -418,7 +439,8 @@ def fold(events: list[dict]) -> dict[str, dict]:
             t["replies"].append(e)
         else:
             t.update(status="CLOSED", closed_by=e["from"], closed_reason=e.get("reason"),
-                     closed_ts=e["ts"], closed_at=e.get("at"))
+                     closed_ts=e["ts"], closed_at=e.get("at"), closed_outcome=e.get("outcome"),
+                     closed_model=e.get("model"))
     return threads
 
 
