@@ -64,6 +64,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | `sprint` | string | Sprint name; equals the file it is stored in |
 | `ts` | string | Local time `YYYY-MM-DD HH:MM`. Imported entries may carry only `YYYY-MM-DD`, or `unknown` |
 | `at` | string | Optional (baton ≥ 1.1): the exact time in UTC, ISO 8601 (`2026-10-07T18:55:03Z`). Metrics prefer it to `ts`. Imported events have none |
+| `model`, `model_src` | strings | Optional (baton ≥ 1.6): the model that wrote the event, and where the name came from (`flag`, `env` or `detected`) |
 
 `entry` adds:
 
@@ -75,11 +76,12 @@ Every line of a sprint file is one event. All events carry these fields:
 | `title`, `body` | string | Text. `title` may be empty on imported entries |
 | `files`, `cites`, `blocks` | arrays of strings | Affected files (required for `C`), cited ids, and what the entry blocks |
 | `phase` | string | Optional (baton ≥ 1.3): on `H` entries, the `--phase` of the hand-off |
+| `state` | string | Optional (baton ≥ 1.6): on `H` entries, the `--state` of the hand-off, for example `DONE pending QA` |
 | `supersedes` | array of strings | Optional (baton ≥ 1.3): on `C` entries, the contracts this one replaces. baton closes them in the same command |
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |
 
-`reply` adds `body` (string). `close` adds `reason` (string, may be empty). Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
+`reply` adds `body` (string). `close` adds `reason` (string, may be empty) and, optionally (baton ≥ 1.6), `outcome`: `accepted` or `rework`, the receiver's verdict when it closes a hand-off. Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
 
 Ids look like `<kind>-<n zero-padded to id_width>`, for example `Q-007`. An imported duplicate gets the suffix `~2`, `~3` and so on.
 

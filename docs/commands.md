@@ -115,6 +115,7 @@ Posts an entry of a kind: `Q` question, `C` contract change (needs `--files`), `
 | `--cites IDS` | Comma-separated doc, story or decision ids. |
 | `--blocks IDS` | Comma-separated stories or tasks this blocks. |
 | `--supersedes IDS` | With `C`: the contracts this one replaces. baton cites them and closes them as `superseded by C-…`, so only one shape stays live. |
+| `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
 | `--body-file FILE` | Read the body from a file. |
 
 ```console
@@ -143,6 +144,8 @@ Closes threads that are settled.
 | `--sprint NAME` | Close every settled open thread of a sprint. Unanswered `Q` and `B` and live `C` entries stay open. |
 | `--include-unanswered` | With `--sprint`, also close unanswered questions and blockers. For imports. |
 | `--include-contracts` | With `--sprint`, also close `C` entries. For imports. |
+| `--outcome accepted\|rework` | With hand-offs: your verdict on the work you received. `rework` means it came back wrong. Closing a hand-off through `handoff --closes` records `accepted`. |
+| `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
 
 ```bash
 baton close Q-231 --as backend --reason "answered in C-240"
@@ -170,6 +173,7 @@ baton: hand-off refused:
 | `--files FILES`, `--cites IDS` | Affected files; cited ids. |
 | `--closes IDS` | Threads this hand-off settles, for example the hand-offs to you that you checked. |
 | `--force` | Hand off despite the refusal. Give the reason in the body. |
+| `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
 
 ```console
 $ baton handoff --as backend --phase S1-A --state "DONE pending QA" --to qa --title "S1-A backend" -
@@ -279,11 +283,18 @@ The orchestrator closes a phase after its gate passes with `baton close --phase 
 
 ### `baton metrics`
 
-Board health: answer and close times, stale threads, quiet contracts, refused writes, per-role load and token cost.
+Board health: answer and close times, stale threads, quiet contracts, refused writes, per-role load and token cost, how roles behave around hand-offs, and the same by model.
 
 - **Stale** threads are open threads idle for at least `--stale`. Open contracts are left out: a contract stays open while it holds.
 - **Quiet contracts** are open `C` entries that nobody has replied to or cited for at least `--stale`. Check that they still hold, then supersede or close them.
 - **Refused** counts the writes baton refused (hand-offs, contracts without files, policies) and the hand-offs forced with `--force`. It also says how many hand-offs refused on an open question were resolved by answering it. The log is `<dir>/.local/refusals.jsonl`: local to the checkout, git-ignored, and not part of the board.
+
+- **Hand-offs by role** counts the hand-offs a role sent and how the receivers judged them (`accepted`, `rework`), and:
+  - *bounced*: later threads from others that cite one of its hand-offs;
+  - *median hold*: from a hand-off a role received to its next hand-off;
+  - *median pickup*: from a hand-off a role received to its first event after it;
+  - *refused* and *forced* hand-offs (from the local log).
+- **By model** counts events and hand-offs per model, and the verdicts on those hand-offs. These numbers describe how work moves between agents, not how good the code is, so read them as a place to look, not a score. A model that only wrote a few hand-offs says little.
 
 | Flag | Meaning |
 |---|---|
@@ -350,6 +361,16 @@ baton serve --open
 ```
 
 The board is also at `/api/board.json`, and the metrics at `/api/metrics.json`.
+
+## Which model wrote it
+
+Every entry, reply and close records the model that wrote it as `model`, with `model_src` saying where the name came from. baton looks in this order and stops at the first match:
+
+1. `--model NAME` on `post`, `reply`, `close` or `handoff`. Any agent can pass it: it knows its own model id.
+2. `$BATON_MODEL`, for a wrapper or hook that knows the model.
+3. Detection. baton reads the model name from the tail of the session record of the agent running the command, and keeps nothing else. It works for Claude Code (found by `$CLAUDE_CODE_SESSION_ID`, and it follows `/model`) and for Codex (found by `$CODEX_THREAD_ID`). Those record layouts are not a documented interface, so detection is best effort: when it finds nothing, no model is recorded and no command fails. Set `BATON_MODEL_DETECT=0` to turn it off.
+
+A hand-off that records no model prints a note asking for `--model`. A sub-agent on a different model from its parent is detected only if it runs as its own session, so pass `--model` there.
 
 ## Setup and maintenance
 
@@ -444,7 +465,7 @@ Prints the one-screen guide for an agent's brief.
 
 `baton mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdio, with no dependencies. Its instructions tell clients to prefer the `baton` command when they can run shell commands. Each tool runs the matching command in-process, so the same rules apply: the hand-off cap, the unanswered-question check, `C` entries needing files and your policies.
 
-Register it with `baton mcp install`. Each tool takes a `role` argument, or uses `BATON_ROLE`. The board is found from the server's working directory, or from `BATON_ROOT`.
+Register it with `baton mcp install`. Each tool takes a `role` argument, or uses `BATON_ROLE`. The tools that write also take `model`, or use `BATON_MODEL`, and `baton_close` takes `outcome`. The board is found from the server's working directory, or from `BATON_ROOT`.
 
 | Tool | Same as | Arguments |
 |---|---|---|

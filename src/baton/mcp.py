@@ -26,6 +26,7 @@ PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 _ROLE = {"type": "string", "description": "your role, e.g. backend (defaults to $BATON_ROLE)"}
 _IDS = {"type": "array", "items": {"type": "string"}}
 _STRS = {"type": "array", "items": {"type": "string"}}
+_MODEL = {"type": "string", "description": "the model you are, e.g. the model id from your system prompt (defaults to $BATON_MODEL)"}
 
 
 def _tool(name, description, props, required=()):
@@ -51,21 +52,25 @@ TOOLS = [
           {"role": _ROLE, "kind": {"type": "string", "enum": ["Q", "C", "D", "B"]},
            "to": {**_STRS, "description": "roles, or [\"all\"]"}, "title": {"type": "string"},
            "body": {"type": "string"}, "files": _STRS, "cites": _STRS, "blocks": _STRS,
-           "supersedes": {**_IDS, "description": "with C: contracts this one replaces (they are closed)"}},
+           "supersedes": {**_IDS, "description": "with C: contracts this one replaces (they are closed)"},
+           "model": _MODEL},
           ["kind", "to", "title", "body"]),
     _tool("baton_reply", "Answer a thread; close=true also closes it as settled.",
           {"role": _ROLE, "id": {"type": "string"}, "body": {"type": "string"},
-           "close": {"type": "boolean"}}, ["id", "body"]),
+           "close": {"type": "boolean"}, "model": _MODEL}, ["id", "body"]),
     _tool("baton_close", "Close threads that are settled (answered, fixed or superseded). Orchestrators: "
           "pass sprint to close every settled thread of a sprint (unanswered Q/B and live contracts stay open), "
           "or phase to close a phase's hand-offs once it passes its gate.",
           {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"}, "sprint": {"type": "string"},
-           "phase": {"type": "string"}}),
+           "phase": {"type": "string"}, "model": _MODEL,
+           "outcome": {"type": "string", "enum": ["accepted", "rework"],
+                       "description": "with hand-off ids: judge the work you received (rework: it came back wrong)"}}),
     _tool("baton_handoff", "Hand off finished work (at most 20 lines) and update your status row. "
           "Refused while a question addressed to you is unanswered.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"},
            "to": _STRS, "title": {"type": "string"}, "body": {"type": "string"},
-           "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"}},
+           "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"},
+           "model": _MODEL},
           ["phase", "state", "to", "title", "body"]),
     _tool("baton_status", "The status table: one row per role. Pass role and state to set your own row.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"}}),
@@ -148,6 +153,10 @@ def validate(schema: dict, args) -> dict:
     return {k: _value(k, props[k], v) for k, v in args.items() if v is not None and k in props}
 
 
+def _model(a: dict) -> list[str]:
+    return [_opt("model", a["model"])] if a.get("model") else []
+
+
 def _csv(values) -> str:
     return ",".join(values or [])
 
@@ -173,11 +182,13 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
         for key in ("files", "cites", "blocks", "supersedes"):
             if a.get(key):
                 out.append(_opt(key, _csv(a[key])))
-        return out + ["--", a["kind"]]
+        return out + _model(a) + ["--", a["kind"]]
     if name == "baton_reply":
-        return ["reply", *role, _opt("body-file", body_file)] + (["--close"] if a.get("close") else []) + ["--", a["id"]]
+        return (["reply", *role, *_model(a), _opt("body-file", body_file)] + (["--close"] if a.get("close") else [])
+                + ["--", a["id"]])
     if name == "baton_close":
-        return (["close", *role] + ([_opt("sprint", a["sprint"])] if a.get("sprint") else [])
+        return (["close", *role, *_model(a)] + ([_opt("sprint", a["sprint"])] if a.get("sprint") else [])
+                + ([_opt("outcome", a["outcome"])] if a.get("outcome") else [])
                 + ([_opt("phase", a["phase"])] if a.get("phase") else [])
                 + ([_opt("reason", a["reason"])] if a.get("reason") else [])
                 + (["--", *a["ids"]] if a.get("ids") else []))
@@ -187,7 +198,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
         for key in ("files", "cites", "closes"):
             if a.get(key):
                 out.append(_opt(key, _csv(a[key])))
-        return out + (["--force"] if a.get("force") else [])
+        return out + _model(a) + (["--force"] if a.get("force") else [])
     if name == "baton_status":
         if a.get("state"):
             return ["status", *role, _opt("state", a["state"])] + ([_opt("phase", a["phase"])] if a.get("phase") else [])

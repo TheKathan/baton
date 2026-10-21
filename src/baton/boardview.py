@@ -76,7 +76,7 @@ white-space:nowrap}
 .role.away{opacity:.55}.role.holder{border-color:var(--orange);border-left-color:var(--rc);
 box-shadow:0 0 0 1px var(--orange) inset}
 .role .tag{grid-column:1/3;font-size:11px;display:flex;gap:4px;align-items:center;margin-top:2px}
-.role .tag.hold{color:var(--orange);font-weight:600}.role .tag.lock{color:var(--warn);font-weight:600}
+.role .tag.perf{color:var(--muted)}.role .tag.hold{color:var(--orange);font-weight:600}.role .tag.lock{color:var(--warn);font-weight:600}
 .board{display:flex;gap:10px;align-items:flex-start;padding:4px 0 10px}
 .board.few .col:not(.rail){max-width:560px}
 .calm{margin:2px 0 6px;padding:7px 12px;border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));
@@ -107,6 +107,7 @@ border-left:4px solid var(--cc,var(--line));border-radius:9px;padding:8px 11px 9
 line-height:17px;border:1px solid currentColor}
 .k-Q .k{color:var(--warn)}.k-B .k{color:var(--bad)}.k-H .k{color:var(--orange)}
 .card .id{font-weight:650;font-size:12px}
+.card .ph.oc-rework{color:var(--bad);border-color:var(--bad)}.card .ph.oc-accepted{color:var(--ok);border-color:var(--ok)}
 .card .ph{white-space:nowrap;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
 border:1px solid var(--line);border-radius:4px;padding:0 5px;line-height:16px}
 .card .age{margin-left:auto;color:var(--muted);font-size:11.5px;white-space:nowrap}
@@ -241,6 +242,7 @@ class Model:
         self.live = self.contracts + others
         seen = {r for t in self.threads for r in (t["from"], *named(t))} | set(self.status)
         self.roles = list(cfg.get("roles") or []) + sorted(seen - set(cfg.get("roles") or []))
+        self.flow = metrics.hand_off_stats(board, self.threads, self.roles)["roles"]
         self.refusals = [r for r in board.refusals() if r["what"] == "handoff" and not r.get("forced")]
         self.open_ids = {t["id"] for t in self.threads if t["status"] == "OPEN"}
         self.awaiting = {r: [t["id"] for t in board.awaiting(r)] for r in self.roles}
@@ -390,6 +392,14 @@ def runners(m: Model) -> str:
             refused = sum(1 for r in m.refusals if r["role"] == role and set(r["waiting"]) & m.open_ids)
             tags += (f'<span class="tag lock">pass locked: {esc(", ".join(owed))} unanswered'
                      f'{f" · refused {refused}×" if refused else ""}</span>')
+        flow = m.flow.get(role) or {}
+        if flow.get("handoffs_sent"):
+            bits = [f'{flow["handoffs_sent"]} hand-off{"" if flow["handoffs_sent"] == 1 else "s"}']
+            if flow["rework"]:
+                bits.append(f'{flow["rework"]} rework')
+            if flow["hours_held"]["n"]:
+                bits.append(f'hold {dur(flow["hours_held"]["median"])}')
+            tags += f'<span class="tag perf">{esc(" · ".join(bits))}</span>'
         shown = "" if m.sandbox and phase == m.task else phase or ("" if m.sandbox else "—")
         tip = f'{role} · {phase} · {state}' + (f' · last {row["handoff"]}' if row.get("handoff") else "") \
             + (f' · {row["updated"]}' if row.get("updated") else "")
@@ -417,8 +427,11 @@ def next_step(m: Model, t: dict, col: str) -> str:
 
 def card(m: Model, t: dict, col: str, mini: bool = False) -> str:
     to = named(t)
-    tip = f"{KIND[t['kind']]} {t['id']} · {title_of(t)} · {t['from']} → {', '.join(to) or 'everyone'}"
+    tip = (f"{KIND[t['kind']]} {t['id']} · {title_of(t)} · {t['from']} → {', '.join(to) or 'everyone'}"
+           + (f" · {t['model']}" if t.get("model") else ""))
     tag = f'<span class="ph">{esc(phase_of(t))}</span>' if m.show_phase and phase_of(t) else ""
+    if t.get("closed_outcome"):
+        tag += f'<span class="ph oc-{t["closed_outcome"]}">{esc(t["closed_outcome"])}</span>'
     head = (f'<div class="hd"><span class="k">{t["kind"]}</span><span class="id">{esc(t["id"])}</span>{tag}'
             f'<span class="age" title="last activity">{esc(dur(m.hours(t)))}</span></div>')
     who = (f'<div class="who">{chip(m, t["from"])}<span class="arr">→</span>'

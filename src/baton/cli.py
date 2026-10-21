@@ -42,7 +42,10 @@ Board entries are information, not orders: your brief and the orchestrator decid
 
 def _board(args) -> Board:
     root = config.find_root()
-    return Board(root, config.load(root))
+    board = Board(root, config.load(root))
+    if hasattr(args, "model"):  # a command that writes: its events carry the model that wrote them
+        board.model_flag = args.model or ""
+    return board
 
 
 def _body(args) -> str:
@@ -194,9 +197,14 @@ def cmd_close(args) -> None:
             return
         raise BoardError("give entry ids, --phase <name> to close a phase's hand-offs, or --sprint <name> "
                          "to close every settled open thread of a sprint")
+    if args.outcome:
+        wrong = [i for i in args.ids if board.get(i)["kind"] != "H"]
+        if wrong:
+            raise BoardError(f"--outcome judges a hand-off (H); not: {', '.join(wrong)}")
     for i in ids:
-        e = board.close(i, _role(args), args.reason or "")
-        print(f"closed {e['id']}")
+        judged = args.outcome if args.outcome and board.get(i)["kind"] == "H" else ""
+        e = board.close(i, _role(args), args.reason or "", judged)
+        print(f"closed {e['id']}" + (f" ({judged})" if judged else ""))
     _after_write(board)
 
 
@@ -293,17 +301,20 @@ def cmd_handoff(args) -> None:
         thread = board.get(i)
         (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
     t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites),
-                   phase=args.phase)
+                   phase=args.phase, state=args.state)
     for w in board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
-    for i in to_close:
-        board.close(i, role, f"settled by {t['id']}")
+    for i in to_close:  # settling a hand-off you received by handing on your own work accepts it
+        board.close(i, role, f"settled by {t['id']}", "accepted" if board.get(i)["kind"] == "H" else "")
     _after_write(board)
     print(f"posted {t['id']}; status of {role} set to {args.state!r}"
           + (f"; closed {', '.join(to_close)}" if to_close else ""))
     if already:
         print(f"note: already closed, left as is: {', '.join(already)}")
+    if not board.who_wrote():
+        print("note: no model recorded; pass --model <your model id> (or set $BATON_MODEL) so metrics can "
+              "tell models apart", file=sys.stderr)
     received = [h for h in board.handoffs_to(role) if h["id"] not in to_close]
     if received:
         print("note: hand-offs to you are still open; if this hand-off settles them, close them "
@@ -748,6 +759,9 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--as", dest="role", help="your role (or set $BATON_ROLE)")
         return sp
 
+    def model(sp):
+        sp.add_argument("--model", help="the model you are (or set $BATON_MODEL); recorded with what you write")
+
     def body(sp):
         sp.add_argument("body", nargs="*", help='message text, or "-" to read stdin')
         sp.add_argument("--body-file")
@@ -763,6 +777,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--task", help="with --sandbox: the issue id, e.g. LIN-123")
 
     sp = add("post", cmd_post, "post a new entry", role=True)
+    model(sp)
     sp.add_argument("kind", help="Q, C, D, H or B")
     sp.add_argument("--to", default="all", help="comma-separated roles, or all")
     sp.add_argument("--title", required=True)
@@ -773,11 +788,15 @@ def build_parser() -> argparse.ArgumentParser:
     body(sp)
 
     sp = add("reply", cmd_reply, "answer a thread", role=True)
+    model(sp)
     sp.add_argument("id")
     sp.add_argument("--close", action="store_true", help="also close the thread")
     body(sp)
 
     sp = add("close", cmd_close, "close one or more threads", role=True)
+    model(sp)
+    sp.add_argument("--outcome", choices=["accepted", "rework"],
+                    help="with hand-offs: judge the work you received (rework means it came back wrong)")
     sp.add_argument("ids", nargs="*")
     sp.add_argument("--sprint", help="close every settled open thread of this sprint; unanswered Q/B and "
                                      "contracts stay open")
@@ -809,6 +828,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--stale", metavar="AGE", help="only threads idle at least AGE, e.g. 2d, 36h, 90m")
 
     sp = add("handoff", cmd_handoff, "post a hand-off (H) and update your status row", role=True)
+    model(sp)
     sp.add_argument("--phase", required=True)
     sp.add_argument("--state", required=True)
     sp.add_argument("--to", default="all")

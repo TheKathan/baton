@@ -123,6 +123,53 @@ def refusal_stats(board: Board, sprint: str | None = None) -> dict:
             "handoffs_on_open_questions": len(handoffs), "resolved_by_answering": sum(map(resolved, handoffs))}
 
 
+def hand_off_stats(board: Board, scope: list[dict], known: list[str], sprint: str | None = None) -> dict:
+    """How roles behave around hand-offs, and per model: derived from the event log and the local refusal log.
+
+    hold: a hand-off received to the role's next hand-off. pickup: a hand-off received to the role's
+    first event after it. bounced: later threads from others that cite a hand-off the role sent.
+    accepted / rework: the verdict the receiver gave when closing a hand-off the role sent."""
+    events = [e for e in board.events() if sprint is None or e.get("sprint") == sprint]
+    handoffs = sorted((t for t in scope if t["kind"] == "H"), key=lambda t: t.get("ev", 0))
+    roles = set(known) | {t["from"] for t in scope} | {r for t in handoffs for r in t["to"] if r != "all"}
+    out = {r: {"handoffs_sent": 0, "accepted": 0, "rework": 0, "bounced": 0, "refused": 0, "forced": 0,
+               "hours_held": [], "hours_to_pickup": [], "models": {}} for r in roles}
+    for h in handoffs:
+        mine = out[h["from"]]
+        mine["handoffs_sent"] += 1
+        outcome = h.get("closed_outcome")
+        if outcome in ("accepted", "rework"):
+            mine[outcome] += 1
+        citing = {x["id"] for x in scope if h["id"] in (x.get("cites") or []) and x["from"] != h["from"]}
+        mine["bounced"] += len(citing)
+        for r in (r for r in h["to"] if r != "all"):
+            nxt = next((x for x in handoffs if x["from"] == r and x.get("ev", 0) > h.get("ev", 0)), None)
+            if nxt:
+                out[r]["hours_held"].append(hours_between(h["ts"], nxt["ts"], h.get("at"), nxt.get("at")))
+            first = next((e for e in events if e["from"] == r and e.get("ev", 0) > h.get("ev", 0)), None)
+            if first:
+                out[r]["hours_to_pickup"].append(hours_between(h["ts"], first["ts"], h.get("at"), first.get("at")))
+    for r in board.refusals():
+        if (sprint is None or r.get("sprint") == sprint) and r["role"] in out:
+            out[r["role"]]["forced" if r.get("forced") else "refused"] += 1
+    for e in events:
+        if e["from"] in out:
+            m = out[e["from"]]["models"]
+            m[e.get("model") or "(unknown)"] = m.get(e.get("model") or "(unknown)", 0) + 1
+    for x in out.values():
+        x["hours_held"], x["hours_to_pickup"] = _stats(x["hours_held"]), _stats(x["hours_to_pickup"])
+    by_model: dict[str, dict] = {}
+    for e in events:
+        m = by_model.setdefault(e.get("model") or "(unknown)", {"events": 0, "handoffs": 0, "accepted": 0, "rework": 0})
+        m["events"] += 1
+    for h in handoffs:
+        m = by_model.setdefault(h.get("model") or "(unknown)", {"events": 0, "handoffs": 0, "accepted": 0, "rework": 0})
+        m["handoffs"] += 1
+        if h.get("closed_outcome") in ("accepted", "rework"):
+            m[h["closed_outcome"]] += 1
+    return {"roles": out, "models": by_model}
+
+
 def _tokens(text: str) -> int:
     return (len(text) + 3) // 4  # same estimate as `baton stats` (~4 characters per token)
 
@@ -139,6 +186,7 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
     roles = board.cfg.get("roles") or sorted({t["from"] for t in every} | set(board.status()))
     from .cli import _unread_text  # lazy: cli imports this module
     per_role = {}
+    flow = hand_off_stats(board, scope, roles, sprint)
     for r in roles:
         unread_text, unread_count = _unread_text(board, r, False, peek=True)
         mine = [t for t in scope if t["from"] == r]
@@ -155,6 +203,7 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
             "open_owned": sum(1 for t in mine if t["status"] == "OPEN"),
             "unread": unread_count,
             "unread_tokens": _tokens(unread_text),
+            **flow["roles"][r],
         }
     return {
         "generated": now.strftime("%Y-%m-%d %H:%M"),
@@ -166,6 +215,7 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
                         "tokens": _tokens("".join(render.entry_md(t) for t in sprints[s]))}
                     for s in order if sprint is None or s == sprint},
         "roles": per_role,
+        "models": flow["models"],
     }
 
 
@@ -201,6 +251,15 @@ def format_text(m: dict) -> str:
         lines.append(f"{r:14} {x['posted']:6} {x['replies']:8} {x['asked_of']:6} {x['answered']:9}  "
                      f"{_short(x['hours_to_answer']):>13}  {x['waiting_on']:10}  {x['open_owned']:10}"
                      f"  {x['unread']} (~{x['unread_tokens']})")
+    lines += ["", "Hand-offs      sent  accepted  rework  bounced  median hold  median pickup  refused  forced  models"]
+    for r, x in m["roles"].items():
+        models = ", ".join(f"{k} {v}" for k, v in sorted(x["models"].items(), key=lambda kv: -kv[1]))
+        lines.append(f"{r:14} {x['handoffs_sent']:4} {x['accepted']:9} {x['rework']:7} {x['bounced']:8}  "
+                     f"{_short(x['hours_held']):>11}  {_short(x['hours_to_pickup']):>13}  {x['refused']:7}  "
+                     f"{x['forced']:6}  {models or '—'}")
+    lines += ["", "Model                    events  hand-offs  accepted  rework"]
+    for name, x in sorted(m["models"].items(), key=lambda kv: -kv[1]["events"]):
+        lines.append(f"{name:24} {x['events']:6} {x['handoffs']:10} {x['accepted']:9} {x['rework']:7}")
     return "\n".join(lines)
 
 

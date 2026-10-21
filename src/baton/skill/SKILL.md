@@ -47,7 +47,8 @@ An open thread means someone still owes something. Close a thread when it become
 - **Close your own threads** once they're settled, for example a blocker someone fixed. Nobody else will. If you can't re-check a fix yourself, close it on the fixer's word and put "not re-verified" in `--reason`.
 - **After answering a question addressed to you,** close it with `reply … --close` if your answer settles it.
 - **Don't close someone else's unanswered question or blocker.** That deletes their reminder without giving them an answer.
-- **Hand-offs to you are yours to close** once you've checked the work (QA: at your gate). Pass them in `--closes` on your own hand-off. `baton brief` lists the ones still open.
+- **Hand-offs to you are yours to close** once you've checked the work (QA: at your gate). Pass them in `--closes` on your own hand-off, which records them as accepted. If the work came back wrong, close it with `baton close H-… --outcome rework --reason "what failed"`. `baton brief` lists the ones still open.
+- **Say which model you are** with `--model <your model id>` on what you write, unless baton already records it for you. baton prints a note on a hand-off when it has no model.
 
 ## Handing off
 ```bash
