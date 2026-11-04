@@ -240,6 +240,16 @@ class BoardViewTest(Base):
         self.assertIn("ship on friday", page)
         self.assertIn("1 in force", page)
 
+    def test_a_custom_kind_renders_generically(self):
+        cfg = json.loads((self.root / ".baton/config.json").read_text())
+        cfg["kinds"] = {**cfg.get("kinds", config.DEFAULTS["kinds"]), "R": "review"}
+        (self.root / ".baton/config.json").write_text(json.dumps(cfg))
+        r = self.add("R", "qa", ["backend"], "review the orders api")
+        page = boardview.board_page(self.board(), self.now)
+        self.assertIn("qa posted a review", page)
+        m = self.model()
+        self.assertIn(f'title="review {r}', boardview.card(m, next(t for t in m.threads if t["id"] == r), "done"))
+
     def test_quiet_board_says_so(self):
         quiet = boardview.board_page(self.board(), self.now)
         self.assertNotIn("Nothing blocked", quiet)
