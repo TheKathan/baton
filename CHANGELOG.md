@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+- The `baton serve` board page no longer crashes with a `KeyError` when a thread uses a custom kind from `config.json` `kinds`. The activity feed shows it as "<role> posted a <kind name>" (#36).
+
 ## [1.7.0] - 2026-10-21
 
 ### Added

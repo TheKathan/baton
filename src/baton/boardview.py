@@ -234,6 +234,7 @@ class Model:
         self.now = now or datetime.now()
         self.sandbox = bool(cfg.get("sandbox"))
         self.sprint, self.task = cfg["sprint"], cfg.get("task", "")
+        self.kinds = {**KIND, **{k: v for k, v in (cfg.get("kinds") or {}).items() if k not in KIND}}
         self.status = board.status()
         every = sorted(board.entries().values(), key=lambda t: t.get("n", 0))
         self.threads = [t for t in every if t["sprint"] == self.sprint]
@@ -334,6 +335,10 @@ class Model:
         cols["prog"].sort(key=lambda p: p["row"].get("updated") or "", reverse=True)
         return cols
 
+    def kind(self, t: dict) -> str:
+        """The thread's kind as a word: the built-in name, else the name the config gives it, else its letter."""
+        return self.kinds.get(t["kind"]) or t["kind"]
+
     def in_sprint(self, phase: str | None) -> bool:
         return not phase or phase == self.sprint or phase.startswith(self.sprint + "-")
 
@@ -348,7 +353,7 @@ class Model:
             to = words(named(t)) or "everyone"
             verb = {"Q": f"{t['from']} asked {to}", "B": f"{t['from']} raised a blocker",
                     "C": f"{t['from']} agreed a contract", "D": f"{t['from']} recorded a decision",
-                    "H": f"{t['from']} handed off to {to}"}[t["kind"]]
+                    "H": f"{t['from']} handed off to {to}"}.get(t["kind"]) or f"{t['from']} posted a {self.kind(t)}"
             when = metrics.moment(t["ts"], t.get("at"))
             if when:
                 out.append((when, verb, t["id"], ""))
@@ -427,7 +432,7 @@ def next_step(m: Model, t: dict, col: str) -> str:
 
 def card(m: Model, t: dict, col: str, mini: bool = False) -> str:
     to = named(t)
-    tip = (f"{KIND[t['kind']]} {t['id']} · {title_of(t)} · {t['from']} → {', '.join(to) or 'everyone'}"
+    tip = (f"{m.kind(t)} {t['id']} · {title_of(t)} · {t['from']} → {', '.join(to) or 'everyone'}"
            + (f" · {t['model']}" if t.get("model") else ""))
     tag = f'<span class="ph">{esc(phase_of(t))}</span>' if m.show_phase and phase_of(t) else ""
     if t.get("closed_outcome"):
