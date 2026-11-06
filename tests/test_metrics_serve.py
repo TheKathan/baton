@@ -126,8 +126,44 @@ class ServeTest(Base):
         code, body, _ = self.get("/metrics")
         self.assertEqual(code, 200)
         for text in ("Time to first answer (median)", "2.0h", "Time to close (median)", "4.0h",
-                     "Questions answered", "By sprint", "By role", "Unread (~tokens)", "Board health"):
+                     "Questions answered", "By sprint", "By role", "Unread (~tokens)", "Board health",
+                     "p90 2.0h · n=1", "Hand-offs by role", "By model"):
             self.assertIn(text, body)
+        self.assertNotIn("<script", body)
+
+    def test_metrics_page_shares_the_board_shell(self):
+        _, body, _ = self.get("/metrics")
+        _, board, _ = self.get("/")
+        self.assertIn('<header class="top">', body)
+        self.assertIn('<a href="/metrics" aria-current="page">metrics</a>', body)
+        self.assertIn('<a href="/">board</a>', body)
+        self.assertIn('<a href="/" aria-current="page">board</a>', board)
+        self.assertIn("sprint <b>S1</b>", body)
+        self.assertIn('http-equiv="refresh" content="30"', body)
+        self.assertIn(boardview.CSS, body)  # the board's tokens, not a fork of them
+        self.assertIn("<footer>baton serve · read-only · refreshes every 30 s", body)
+        for kpi in ("Open threads", "Blockers", "Unanswered Q/B", "Stale (≥48h)", "Median first answer", "Close rate"):
+            self.assertIn(kpi, body)
+        self.assertIn('class="kpi t-bad"', body)  # an open blocker
+
+    def test_metrics_page_bars_use_role_colours(self):
+        page = serve.metrics_page(self.board(), self.now)
+        m = boardview.Model(self.board(), self.now)
+        self.assertIn(f'<span class="{m.rc("qa")}"><div class="bar"', page)  # qa posted, so it has a bar
+        self.assertIn('class="s-own"', page)
+        self.assertIn('class="s-ev"', page)  # by-model bars
+        self.assertIn('class="tm"', page)  # median and p90 markers
+        self.assertNotIn("<script", page)
+
+    def test_entry_and_error_pages_share_the_shell(self):
+        code, body, _ = self.get("/e/Q-1")
+        self.assertIn('<header class="top">', body)
+        self.assertIn("paginated?", body)
+        code, body, _ = self.get("/nope")
+        self.assertEqual(code, 404)
+        self.assertIn('<header class="top">', body)
+        self.assertIn("Not found. Try /", body)
+
 
     def test_contracts_page(self):
         code, body, _ = self.get("/contracts")
@@ -264,6 +300,26 @@ class BoardViewTest(Base):
             self.add("H", "backend", ["qa"], f"hand-off {i}")
         page = boardview.board_page(self.board(), self.now)
         self.assertIn("+3 more", page)  # 7 waiting hand-offs fold after 4
+
+
+class EmptyMetricsTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        os.environ["BATON_ROOT"] = str(self.root)
+        run("init", "--root", str(self.root))
+
+    def tearDown(self):
+        os.environ.pop("BATON_ROOT", None)
+        self.tmp.cleanup()
+
+    def test_a_fresh_board_renders_calm_empty_states(self):
+        page = serve.metrics_page(Board(self.root, config.load(self.root)))
+        for text in ("No hand-offs yet.", "No sprints yet.", "No events yet.", "no data yet", "nothing posted yet"):
+            self.assertIn(text, page)
+        self.assertNotIn('class="bar"', page)  # nothing to chart
+        self.assertNotIn("<svg class=\"spark\"", page)
+        self.assertIn('aria-current="page">metrics', page)
 
 
 if __name__ == "__main__":

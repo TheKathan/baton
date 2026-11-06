@@ -3,7 +3,7 @@
 Routes (GET only; anything else gets 405):
   /                 the board: a kanban of the work, who holds the baton, decisions and recent activity
   /contracts        live contracts by file area (?f=all|new|old|touched)
-  /metrics          board health: answer and close times, stale threads, per-sprint and per-role load
+  /metrics          board health as a dashboard (metricsview.py): key numbers, times, per-role, per-sprint, per-model
   /e/<id>           one entry with its replies (a sandbox's other tasks: /e/<task>/<id>)
   /api/board.json   open threads and the status table
   /api/metrics.json the same numbers as `baton metrics --json`
@@ -19,129 +19,37 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from . import __version__, boardview, metrics, render, sandbox
+from . import __version__, boardview, metrics, metricsview, render, sandbox
 from .boardview import esc
 from .store import Board, BoardError, normalise_id
 
 CSS = """
-:root{--bg:#f6f8fa;--panel:#fff;--text:#1f2328;--muted:#59636e;--line:#d0d7de;--accent:#c2410c;
---chip:#eef1f4;--warn:#9a6700;--bad:#cf222e;--ok:#1a7f37;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--panel:#161b22;--text:#e6edf3;--muted:#9198a1;
---line:#30363d;--accent:#ff922b;--chip:#21262d;--warn:#d29922;--bad:#f85149;--ok:#3fb950}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);
-font:14px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
-main{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin-bottom:16px}
-h1{font-size:20px;margin:0}h1 b{color:var(--accent)}h2{font-size:15px;margin:24px 0 8px}
-.muted{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
-.card .n{font-size:24px;font-weight:700}.card .l{color:var(--muted);font-size:12px}
-.card .s{color:var(--muted);font-size:12px;margin-top:2px}
-.bad .n{color:var(--bad)}.warn .n{color:var(--warn)}.ok .n{color:var(--ok)}
-.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);
-vertical-align:top}th{font-size:12px;color:var(--muted);font-weight:600}tr:last-child td{border-bottom:0}
-code,.id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
-a{color:inherit}a.id{color:var(--accent);text-decoration:none;white-space:nowrap}
-details>summary{cursor:pointer;font-size:15px;font-weight:600;margin:24px 0 8px}a.id:hover{text-decoration:underline}
-.nw{white-space:nowrap}.kind{display:inline-block;min-width:18px;text-align:center;border-radius:4px;background:var(--chip);padding:0 4px}
-.empty{padding:12px;color:var(--muted)}pre{white-space:pre-wrap;background:var(--panel);border:1px solid var(--line);
+.ent{display:flex;align-items:baseline;gap:10px;margin:16px 0 10px;flex-wrap:wrap}
+.ent h2{margin:0;font:700 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ent .st{font-size:12px;color:var(--muted)}.ent .back{color:var(--indigo);font-size:12.5px}
+pre.md{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;background:var(--panel);border:1px solid var(--line);
 border-radius:10px;padding:14px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-footer{margin-top:28px;color:var(--muted);font-size:12px}
+.by{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin-top:12px}
+.by h3{margin:2px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.by ul{margin:0;padding-left:18px;color:var(--muted);font-size:12.5px}
+.msg{margin:16px 0}
 """
 
 
-def _age(hours) -> str:
-    if hours is None:
-        return "—"
-    return f"{hours / 24:.1f}d" if hours >= 48 else f"{hours:.0f}h"
+def page(title: str, body: str, board: Board | None = None, now: datetime | None = None) -> str:
+    """A page in the shared shell for the entry and error routes (no board model needed)."""
+    cfg = board.cfg if board is not None else {}
+    project = board.root.name if board is not None else "baton"
+    return boardview.shell(project, boardview.scope_of(cfg), now or datetime.now(), body, title,
+                           foot=f"baton {esc(__version__)}", css=CSS)
 
 
-def _table(headers: list[str], rows: list[list[str]], empty: str) -> str:
-    if not rows:
-        return f'<div class="wrap"><div class="empty">{esc(empty)}</div></div>'
-    head = "".join(f"<th>{esc(h)}</th>" for h in headers)
-    body = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
-    return f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
+def error_page(board: Board, message: str) -> str:
+    return page("baton", f'<pre class="md msg">{esc(message)}</pre>', board)
 
 
-def page(title: str, body: str) -> str:
-    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
-            f'content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30">'
-            f"<title>{esc(title)}</title><style>{CSS}</style></head><body><main>{body}"
-            f'<footer>baton {esc(__version__)} · read-only · refreshes every 30 s</footer></main></body></html>')
-
-
-def metrics_page(board: Board) -> str:
-    now = datetime.now()
-    m = metrics.compute(board, now=now)
-    s = m["summary"]
-    open_ = [t for t in board.entries().values() if t["status"] == "OPEN"]
-    blockers = [t for t in open_ if t["kind"] == "B" or t.get("blocks")]
-    cards = [
-        ("Open threads", s["open"], ""), ("Blockers", len(blockers), "bad" if blockers else "ok"),
-        ("Unanswered Q/B", s["unanswered_open"], "warn" if s["unanswered_open"] else "ok"),
-        ("Stale (≥48h)", s["stale_open"], "warn" if s["stale_open"] else "ok"),
-        ("Median first answer", (f'{s["hours_to_first_answer"]["median"]}h'
-                                 if s["hours_to_first_answer"]["n"] else "—"), ""),
-        ("Close rate", f'{int(s["close_rate"] * 100)}%' if s["close_rate"] is not None else "—", ""),
-    ]
-    cards_html = "".join(f'<div class="card {c}"><div class="n">{esc(v)}</div><div class="l">{esc(lbl)}</div></div>'
-                         for lbl, v, c in cards)
-    def stat(x):
-        return (f'{x["median"]}h', f'p90 {x["p90"]}h · n={x["n"]}') if x["n"] else ("—", "no data yet")
-    fa, cl = stat(s["hours_to_first_answer"]), stat(s["hours_to_close"])
-    rf = s["refusals"]
-    health = [
-        ("Time to first answer (median)", fa[0], fa[1], ""),
-        ("Time to close (median)", cl[0], cl[1], ""),
-        ("Opened / closed", f'{s["entries"]} / {s["closed"]}',
-         ", ".join(f"{k} {v}" for k, v in s["by_kind"].items()), ""),
-        ("Questions answered", f'{s["answered"]} / {s["questions_and_blockers"]}',
-         f'{s["unanswered_open"]} open with no answer', "warn" if s["unanswered_open"] else ""),
-        (f'Stale (idle ≥ {m["stale_hours"]:g}h)', s["stale_open"],
-         ", ".join(s["stale_ids"][:6]) + (" …" if len(s["stale_ids"]) > 6 else "") or "none",
-         "warn" if s["stale_open"] else "ok"),
-        (f'Quiet contracts (≥ {m["stale_hours"]:g}h)', s["quiet_contracts"],
-         ", ".join(s["quiet_contract_ids"][:6]) + (" …" if len(s["quiet_contract_ids"]) > 6 else "") or "none",
-         "warn" if s["quiet_contracts"] else "ok"),
-        ("Refused writes", rf["refused"],
-         (f'{rf["resolved_by_answering"]} of {rf["handoffs_on_open_questions"]} hand-offs resolved by answering; '
-          f'{rf["overridden"]} forced'), ""),
-        ("Unread now (all roles)", sum(x["unread"] for x in m["roles"].values()),
-         f'~{sum(x["unread_tokens"] for x in m["roles"].values())} tokens to read', ""),
-    ]
-    health_html = "".join(f'<div class="card {c}"><div class="n">{esc(v)}</div><div class="l">{esc(lbl)}</div>'
-                          f'<div class="s">{esc(sub)}</div></div>' for lbl, v, sub, c in health)
-    sprint_rows = [[esc(name), esc(x["entries"]), esc(x["open"]), esc(x["closed"]), esc(x["answered"]),
-                    esc(metrics._short(x["hours_to_first_answer"])), esc(metrics._short(x["hours_to_close"])),
-                    esc(x["stale_open"]), esc(f'~{x["tokens"]}')] for name, x in m["sprints"].items()]
-    role_rows = [[esc(r), esc(x["posted"]), esc(x["replies"]), esc(f'{x["answered"]}/{x["asked_of"]}'),
-                  esc(metrics._short(x["hours_to_answer"])), esc(x["waiting_on"]), esc(x["open_owned"]),
-                  esc(f'{x["unread"]} (~{x["unread_tokens"]})')]
-                 for r, x in m["roles"].items()]
-    flow_rows = [[esc(r), esc(x["handoffs_sent"]), esc(x["accepted"]), esc(x["rework"]), esc(x["bounced"]),
-                  esc(metrics._short(x["hours_held"])), esc(metrics._short(x["hours_to_pickup"])),
-                  esc(x["refused"]), esc(x["forced"]),
-                  esc(", ".join(f"{k} {v}" for k, v in sorted(x["models"].items(), key=lambda kv: -kv[1])) or "—")]
-                 for r, x in m["roles"].items()]
-    model_rows = [[esc(k), esc(x["events"]), esc(x["handoffs"]), esc(x["accepted"]), esc(x["rework"])]
-                  for k, x in sorted(m["models"].items(), key=lambda kv: -kv[1]["events"])]
-    body = f"""
-<header><h1><a class="id" href="/">baton</a> · {esc(board.root.name)} · metrics</h1>
-<span class="muted">sprint <code>{esc(board.cfg["sprint"])}</code> · {esc(m["generated"])}</span></header>
-<div class="cards">{cards_html}</div>
-<h2>Board health</h2><div class="cards">{health_html}</div>
-<h2>Hand-offs by role</h2>{_table(["Role", "Sent", "Accepted", "Rework", "Bounced", "Median hold", "Median pickup",
-                                    "Refused", "Forced", "Models"], flow_rows, "No hand-offs yet.")}
-<h2>By model</h2>{_table(["Model", "Events", "Hand-offs", "Accepted", "Rework"], model_rows,
-                         "No events yet.")}
-<h2>By sprint</h2>{_table(["Sprint", "Threads", "Open", "Closed", "Answered", "Median 1st answer",
-                            "Median close", "Stale", "~Tokens"], sprint_rows, "No sprints yet.")}
-<h2>By role</h2>{_table(["Role", "Posted", "Replies", "Answered", "Median answer", "Waiting on",
-                         "Open owned", "Unread (~tokens)"], role_rows, "No roles yet.")}
-"""
-    return page(f"metrics · {board.root.name}", body)
+def metrics_page(board: Board, now: datetime | None = None) -> str:
+    return metricsview.metrics_page(board, now)
 
 
 def entry_page(board: Board, entry_id: str) -> str:
@@ -155,9 +63,9 @@ def entry_page(board: Board, entry_id: str) -> str:
             raise BoardError(f"no entry {entry_id}")
     else:
         t = board.get(entry_id)
-    return page(f"{t['id']} · baton", f'<header><h1><a class="id" href="/">baton</a> · {esc(t["id"])}</h1>'
-                f'<span class="muted">{esc(t["status"])} · {esc(t["sprint"])}</span></header>'
-                f"<pre>{esc(render.entry_md(t))}</pre>{_written_by(t)}")
+    return page(f"{t['id']} · baton", f'<div class="ent"><a class="back" href="/">← board</a><h2>{esc(t["id"])}</h2>'
+                f'<span class="st">{esc(t["status"])} · {esc(t["sprint"])}</span></div>'
+                f'<pre class="md">{esc(render.entry_md(t))}</pre>{_written_by(t)}', board)
 
 
 def _written_by(t: dict) -> str:
@@ -171,7 +79,7 @@ def _written_by(t: dict) -> str:
         outcome = f' ({esc(t["closed_outcome"])})' if t.get("closed_outcome") else ""
         rows.append(f'<li>closed{outcome} by {esc(t["closed_by"])}'
                     + (f' with <code>{esc(t["closed_model"])}</code>' if t.get("closed_model") else "") + "</li>")
-    return f'<h2>Written by</h2><ul class="muted">{"".join(rows)}</ul>'
+    return f'<section class="by"><h3>Written by</h3><ul>{"".join(rows)}</ul></section>'
 
 
 def board_json(board: Board) -> dict:
@@ -219,11 +127,11 @@ def make_handler(board: Board):
                     return self._send(200, entry_page(board, path[3:]))
             except BoardError as e:
                 code = 404 if path.startswith("/e/") else 500
-                return self._send(code, page("baton", f"<pre>{esc(e)}</pre>"))
-            return self._send(404, page("baton", "<pre>Not found. Try /</pre>"))
+                return self._send(code, error_page(board, str(e)))
+            return self._send(404, error_page(board, "Not found. Try /"))
 
         def _deny(self):
-            self._send(405, page("baton", "<pre>The baton dashboard is read-only.</pre>"))
+            self._send(405, error_page(board, "The baton dashboard is read-only."))
 
         do_POST = do_PUT = do_PATCH = do_DELETE = _deny
 

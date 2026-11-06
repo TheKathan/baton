@@ -31,7 +31,9 @@ Every change needs a test in `tests/`. Tests run the CLI in-process against a te
 | `src/baton/policies.py` | the project's policies, checked on every new entry |
 | `src/baton/sandbox.py` | sandbox mode: per-task boards, their export and summary, other tasks' contracts |
 | `src/baton/metrics.py` | board health for `baton metrics` and the dashboard |
-| `src/baton/serve.py` | the read-only dashboard (`baton serve`) |
+| `src/baton/serve.py` | the read-only dashboard (`baton serve`): routes, entry and error pages |
+| `src/baton/boardview.py` | the dashboard's shared shell and CSS, the board and the contracts page |
+| `src/baton/metricsview.py` | the dashboard's `/metrics` page |
 | `src/baton/mcp.py` | the MCP server and its tools |
 | `src/baton/skill/SKILL.md` | the agent skill that `baton skill` installs |
 | `bin/baton` | a shim that runs from a checkout without installing |

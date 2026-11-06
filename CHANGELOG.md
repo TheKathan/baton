@@ -4,6 +4,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- `/metrics` in `baton serve` is a dashboard in the same look as the board and `/contracts`: the shared top bar, nav (the current page is marked), colours and footer. A strip of key numbers (open, blockers, unanswered, stale, median first answer, close rate) sits above panels that chart answer and close time (median and p90), load and hand-off outcomes per role in each role's colour, threads, closes and median times per sprint, and events by model. Every number the page showed before is still there, in a compact table beside each chart. Charts are inline SVG and CSS, so the page still needs no script. An empty board shows calm empty states.
+- The entry page (`/e/<id>`) and the error pages use the same shell.
+
 ## [1.8.0] - 2026-11-06
 
 ### Added
