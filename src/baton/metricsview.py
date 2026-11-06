@@ -252,17 +252,22 @@ def attention(view: Model, att: dict[str, list[dict]]) -> str:
     if not any(att.values()):
         return panel("Needs attention", "open blockers, unanswered questions and stale threads in this scope",
                      '<div class="empty">Nothing is blocked, unanswered or stale.</div>', "attention")
-    out = []
+    out, shown = [], set()
     for key_, name, tn in groups:
-        items = att[key_]
-        if not items:
+        if not att[key_]:
             continue
+        # A thread is listed once, in its most urgent group; the count still matches the KPI tile.
+        items = [t for t in att[key_] if t["id"] not in shown]
+        shown.update(t["id"] for t in items)
+        above = len(att[key_]) - len(items)
+        note = f'<span class="muted"> · {above} listed above</span>' if above else ""
         first = "".join(attention_item(view, t) for t in items[:CAP_ATTENTION])
         rest = items[CAP_ATTENTION:]
         more = (f'<details><summary>+{len(rest)} more</summary><ul class="att">'
                 f'{"".join(attention_item(view, t) for t in rest)}</ul></details>') if rest else ""
-        out.append(f'<div class="agrp {tn}" id="{key_}"><h3>{esc(name)}<span class="n">{len(items)}</span></h3>'
-                   f'<ul class="att">{first}</ul>{more}</div>')
+        listed = f'<ul class="att">{first}</ul>' if first else ""
+        out.append(f'<div class="agrp {tn}" id="{key_}"><h3>{esc(name)}<span class="n">{len(att[key_])}</span>'
+                   f'{note}</h3>{listed}{more}</div>')
     return panel("Needs attention", "open blockers, unanswered questions and stale threads in this scope, "
                  "longest idle first", "".join(out), "attention")
 

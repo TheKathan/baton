@@ -180,6 +180,12 @@ class ServeTest(Base):
         self.assertIn("badge &lt;script&gt;alert(1)&lt;/script&gt;?", page)  # a title, escaped
         self.assertIn('<div class="agrp warn" id="stale">', page)
 
+    def test_needs_attention_lists_each_thread_once(self):
+        page = serve.metrics_page(self.board(), self.now)
+        attention = page.split('id="attention"', 1)[1].split("</section>", 1)[0]
+        self.assertEqual(attention.count('href="/e/B-003"'), 1)  # blocked, unanswered and stale
+        self.assertIn("listed above", attention)
+
     def test_metrics_page_bars_use_role_colours(self):
         page = serve.metrics_page(self.board(), self.now)
         m = boardview.Model(self.board(), self.now)
