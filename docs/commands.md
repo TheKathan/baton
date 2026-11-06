@@ -114,7 +114,7 @@ Posts an entry of a kind: `Q` question, `C` contract change (needs `--files`), `
 | `--files FILES` | Comma-separated affected files. Required for `C`. |
 | `--cites IDS` | Comma-separated doc, story or decision ids. |
 | `--blocks IDS` | Comma-separated stories or tasks this blocks. |
-| `--supersedes IDS` | With `C`: the contracts this one replaces. baton cites them and closes them as `superseded by C-…`, so only one shape stays live. |
+| `--supersedes IDS` | With `C`: the contracts this one replaces. baton cites them and closes them as `superseded by C-…`, so only one shape stays live. A `C` posted without it whose `--files` overlap a live contract gets a note on stderr naming that contract: nothing to do if it adds to it, close the old one if it replaces it. |
 | `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
 | `--body-file FILE` | Read the body from a file. |
 
@@ -265,21 +265,24 @@ baton report --since origin/main --strict --summary report.md
 
 ### `baton sprint`
 
-Archives the current sprint to `.baton/archive/` and starts a new one. Open threads carry over and stay on the live board.
+Archives the current sprint to `.baton/archive/` and starts a new one. Unanswered questions, blockers and live contracts carry over and stay on the live board.
+
+It refuses while settled threads of the current sprint are still open (decisions, answered questions, hand-offs): run `baton close --sprint <current>` first, which closes exactly those. Rolling over without it would carry them into the next sprint as if someone still owed them.
 
 | Flag | Meaning |
 |---|---|
 | `NAME` | The new sprint, for example `S2`. |
 | `--force` | Accept a name without digits. |
+| `--carry-settled` | Roll over even though settled threads are still open. |
 
 ```console
 $ baton sprint S2
 archived S1 to .baton/archive/BOARD-S1.md; current sprint is now S2
 ```
 
-When threads are still open, a second line says how many carried over.
+When threads are still open, a second line says how many carried over. When the project has an `orchestrator` role with unread events, a note says so.
 
-The orchestrator closes a phase after its gate passes with `baton close --phase S1-A --as orchestrator`, and a sprint with `baton open --blocking`, then `baton close --sprint S1 --as orchestrator`, then `baton sprint S2`.
+The orchestrator closes a phase after its gate passes with `baton close --phase S1-A --as orchestrator`. To close a sprint: `baton unread --as orchestrator` (should end at 0), `baton close --sprint S1 --as orchestrator`, then `baton open`, which should list only live contracts and questions or blockers someone still owes, then `baton sprint S2`.
 
 ### `baton metrics`
 
@@ -483,7 +486,7 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 | `baton_sandbox_start` | `baton init --sandbox --task` | `task`, `roles`, `force` |
 | `baton_contracts` | `baton contracts` | `paths` |
 | `baton_finish` | `baton finish` | `strict` |
-| `baton_sprint` | `baton sprint` | `name` |
+| `baton_sprint` | `baton sprint` | `name`, `carry_settled` |
 | `baton_metrics` | `baton metrics` | `sprint`, `stale` |
 | `baton_lint` | `baton lint` | `all`, `suggest` |
 

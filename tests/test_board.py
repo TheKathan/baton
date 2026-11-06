@@ -198,6 +198,45 @@ class BoardTest(unittest.TestCase):
         self.assertIn("broadcast", run("open", "--as", "qa", "--all"))
         self.assertIn("2 open", run("open"))
 
+    def test_sprint_refuses_while_settled_threads_are_open(self):
+        run("post", "Q", "--as", "qa", "--to", "backend", "--title", "unanswered", "x")
+        run("post", "D", "--as", "orchestrator", "--title", "settled decision", "x")
+        run("post", "C", "--as", "backend", "--to", "qa", "--title", "shape", "--files", "a.ts", "x")
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as refused:
+            run("sprint", "S2")
+        self.assertIn("1 settled thread(s) of S1 are still open: D-002", str(refused.exception.code))
+        self.assertIn("baton close --sprint S1", str(refused.exception.code))
+        self.assertEqual(config.load(self.root)["sprint"], "S1")
+        run("close", "--sprint", "S1", "--as", "orchestrator", "--reason", "gate passed")
+        out = run("sprint", "S2")
+        self.assertIn("current sprint is now S2", out)
+        self.assertIn("Q-001, C-003", out)  # unanswered questions and live contracts carry over
+
+    def test_sprint_carry_settled_rolls_over_anyway(self):
+        run("post", "D", "--as", "orchestrator", "--title", "settled decision", "x")
+        out = run("sprint", "S2", "--carry-settled")
+        self.assertIn("current sprint is now S2", out)
+        self.assertEqual([t["id"] for t in self.board().open_threads()], ["D-001"])
+
+    def test_sprint_notes_unread_events_for_the_orchestrator(self):
+        run("post", "Q", "--as", "backend", "--to", "orchestrator", "--title", "ruling?", "x")
+        self.assertIn("note: orchestrator has 1 unread event(s)", run("sprint", "S2"))
+        run("unread", "--as", "orchestrator")
+        self.assertNotIn("unread event", run("sprint", "S3"))
+
+    def test_contract_sharing_files_with_a_live_contract_gets_a_note(self):
+        run("post", "C", "--as", "backend", "--to", "qa", "--title", "v1", "--files", "a.ts,b.ts", "x")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            run("post", "C", "--as", "backend", "--to", "qa", "--title", "v2", "--files", "b.ts", "x")
+        self.assertIn("C-002 shares files with live contract(s) C-001", err.getvalue())
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            run("post", "C", "--as", "backend", "--to", "qa", "--title", "v3", "--files", "b.ts",
+                "--supersedes", "C-001,C-002", "x")
+            run("post", "C", "--as", "backend", "--to", "qa", "--title", "other", "--files", "c.ts", "x")
+        self.assertNotIn("shares files", err.getvalue())
+
     def test_long_contract_warns_but_posts(self):
         body = "\n".join(f"line {i}" for i in range(45))
         err = io.StringIO()

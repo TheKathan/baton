@@ -122,6 +122,15 @@ class McpTest(unittest.TestCase):
         self.assertIn("Q-001", self.text(r[11]))
         self.assertNotIn("D-002", self.text(r[11]))
 
+    def test_sprint_tool_refuses_settled_threads_unless_carried(self):
+        r = self.session([
+            self.call(1, "baton_post", role="orchestrator", kind="D", to=["all"], title="scope", body="x"),
+            self.call(2, "baton_sprint", name="S2"),
+            self.call(3, "baton_sprint", name="S2", carry_settled=True),
+        ])
+        self.assertIn("settled thread(s) of S1 are still open", self.text(r[2]))
+        self.assertIn("current sprint is now S2", self.text(r[3]))
+
     def test_sandbox_lifecycle_through_mcp(self):
         import shutil
         import subprocess as sp
