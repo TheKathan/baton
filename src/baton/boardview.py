@@ -174,6 +174,7 @@ text-overflow:ellipsis}
 .crisk{display:inline-block;margin-top:3px;font-size:11px;font-weight:650;color:var(--warn)}
 footer{margin-top:14px;padding:12px 0 18px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
 @media (max-width:1100px){.board{overflow-x:auto}.records{grid-template-columns:1fr}}
+@media (max-width:640px){.nav a{display:inline-flex;align-items:center;min-height:24px;padding:3px 2px}}
 """
 
 
@@ -232,7 +233,7 @@ class Model:
     """What the board shows, decided once: which column each thread is in, who holds what, what touches what."""
 
     def __init__(self, board: Board, now: datetime | None = None):
-        cfg = board.cfg
+        self.cfg = cfg = board.cfg
         self.now = now or datetime.now()
         self.sandbox = bool(cfg.get("sandbox"))
         self.sprint, self.task = cfg["sprint"], cfg.get("task", "")
@@ -590,8 +591,7 @@ def shell(project: str, scope: str, now: datetime, body: str, title: str, curren
 
 def document(project: str, m: Model, body: str, title: str, current: str = "board",
              foot: str = BOARD_FOOT, css: str = "") -> str:
-    scope = (f"task <b>{esc(m.task)}</b> · sandbox" if m.sandbox else f"sprint <b>{esc(m.sprint)}</b>")
-    return shell(project, scope, m.now, body, title, current, foot, css)
+    return shell(project, scope_of(m.cfg), m.now, body, title, current, foot, css)
 
 
 def board_page(board: Board, now: datetime | None = None) -> str:

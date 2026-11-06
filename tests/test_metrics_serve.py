@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import tempfile
 import threading
 import unittest
@@ -127,33 +128,119 @@ class ServeTest(Base):
         self.assertEqual(code, 200)
         for text in ("Time to first answer (median)", "2.0h", "Time to close (median)", "4.0h",
                      "Questions answered", "By sprint", "By role", "Unread (~tokens)", "Board health",
-                     "p90 2.0h · n=1", "Hand-offs by role", "By model"):
+                     "p90 2.0h · n=1", "Owes answers", "Needs attention", "How to read this"):
             self.assertIn(text, body)
+        self.assertIn("No hand-offs yet.", body)  # the fixture has none
+        self.assertIn("<code>(unknown)</code>", body)  # but it has events, so By model has a row
+        self.assertNotIn("No events yet.", body)
         self.assertNotIn("<script", body)
 
     def test_metrics_page_shares_the_board_shell(self):
         _, body, _ = self.get("/metrics")
         _, board, _ = self.get("/")
+        _, contracts, _ = self.get("/contracts")
         self.assertIn('<header class="top">', body)
         self.assertIn('<a href="/metrics" aria-current="page">metrics</a>', body)
         self.assertIn('<a href="/">board</a>', body)
         self.assertIn('<a href="/" aria-current="page">board</a>', board)
-        self.assertIn("sprint <b>S1</b>", body)
+        self.assertIn('<a href="/contracts" aria-current="page">contracts</a>', contracts)
+        self.assertIn("sprint <b>S1</b> · showing <b>sprint S1</b>", body)
         self.assertIn('http-equiv="refresh" content="30"', body)
         self.assertIn(boardview.CSS, body)  # the board's tokens, not a fork of them
         self.assertIn("<footer>baton serve · read-only · refreshes every 30 s", body)
         for kpi in ("Open threads", "Blockers", "Unanswered Q/B", "Stale (≥48h)", "Median first answer", "Close rate"):
             self.assertIn(kpi, body)
-        self.assertIn('class="kpi t-bad"', body)  # an open blocker
+        self.assertIn('<a class="kpi t-bad" href="#blocked">', body)  # an open blocker, linked to its list
+
+    def test_metrics_scope_defaults_to_the_current_sprint(self):
+        self.board().append_raw({"type": "entry", "id": "B-050", "kind": "B", "n": 50, "from": "qa", "to": ["backend"],
+                                 "title": "old blocker", "body": "", "files": [], "cites": [], "blocks": [],
+                                 "ts": "2026-09-01 10:00", "sprint": "S0"})
+        _, body, _ = self.get("/metrics")
+        self.assertIn("Metrics · sprint S1", body)
+        self.assertNotIn('href="/e/B-050"', body)  # S0's blocker is out of scope
+        self.assertIn('<a href="/metrics?sprint=S1" aria-current="true">This sprint (S1)</a>', body)
+        self.assertIn(">S0</span>", body)  # By sprint always shows every sprint
+        _, body, _ = self.get("/metrics?sprint=all")
+        self.assertIn("Metrics · all sprints", body)
+        self.assertIn('href="/e/B-050"', body)
+        self.assertIn('<a href="/metrics?sprint=all" aria-current="true">', body)
+        _, body, _ = self.get("/metrics?sprint=S0")
+        self.assertIn("Metrics · sprint S0", body)
+        self.assertNotIn('href="/e/B-003"', body)
+        _, body, _ = self.get("/metrics?sprint=%3Cscript%3Ex")  # unknown: the current sprint, never echoed raw
+        self.assertIn("Metrics · sprint S1", body)
+        self.assertNotIn("<script", body)
+
+    def test_needs_attention_lists_and_links_the_work(self):
+        page = serve.metrics_page(self.board(), self.now)
+        self.assertIn('<div class="agrp bad" id="blocked">', page)
+        self.assertIn('<a class="id" href="/e/B-003">B-003</a>', page)
+        self.assertIn('<div class="agrp warn" id="unanswered">', page)
+        self.assertIn("badge &lt;script&gt;alert(1)&lt;/script&gt;?", page)  # a title, escaped
+        self.assertIn('<div class="agrp warn" id="stale">', page)
 
     def test_metrics_page_bars_use_role_colours(self):
         page = serve.metrics_page(self.board(), self.now)
         m = boardview.Model(self.board(), self.now)
-        self.assertIn(f'<span class="{m.rc("qa")}"><div class="bar"', page)  # qa posted, so it has a bar
-        self.assertIn('class="s-own"', page)
-        self.assertIn('class="s-ev"', page)  # by-model bars
+        self.assertIn(f'<div class="{m.rc("qa")}"><div class="bar"', page)  # qa posted, so it has a bar
+        self.assertIn('<i class="s-own"', page)
+        self.assertIn('<i class="s-m1"', page)  # neutral series: closed, by-model share
         self.assertIn('class="tm"', page)  # median and p90 markers
+        self.assertIn('class="sp cur"', page)  # the current sprint's column
         self.assertNotIn("<script", page)
+
+    def test_hostile_model_and_custom_kind_are_escaped(self):
+        bad = '"><img src=x onerror=1>'
+        self.board().append_raw({"type": "entry", "id": "R-060", "kind": "R", "n": 60, "from": "qa", "to": ["backend"],
+                                 "title": "risk", "body": "", "files": [], "cites": [], "blocks": [],
+                                 "ts": "2026-10-05 09:00", "model": bad})
+        page = serve.metrics_page(self.board(), self.now)
+        self.assertNotIn("<img", page)
+        self.assertIn("&quot;&gt;&lt;img src=x onerror=1&gt;", page)
+        self.assertIn("R 1", page)  # a custom kind with no configured name falls back to its letter
+
+    def test_handoff_outcomes_split_sent_and_cited_later_is_a_count(self):
+        b = self.board()
+        b.append_raw({"type": "entry", "id": "H-070", "kind": "H", "n": 70, "from": "backend", "to": ["qa"],
+                      "title": "runs api", "body": "", "files": [], "cites": [], "blocks": [], "ts": "2026-10-05 08:00"})
+        b.append_raw({"type": "entry", "id": "Q-071", "kind": "Q", "n": 71, "from": "qa", "to": ["backend"],
+                      "title": "why 500?", "body": "", "files": [], "cites": ["H-070"], "blocks": [],
+                      "ts": "2026-10-05 09:00"})
+        b.append_raw({"type": "close", "id": "H-070", "from": "qa", "reason": "", "ts": "2026-10-05 09:30",
+                      "outcome": "accepted"})
+        page = serve.metrics_page(self.board(), self.now)
+        self.assertIn('<th class="grp" scope="colgroup" colspan="6">As sender</th>', page)
+        self.assertIn("As receiver", page)
+        self.assertIn("Cited later", page)
+        self.assertIn('<i class="s-acc" style="width:100.0%"', page)  # 1 of 1 sent accepted fills the bar
+        self.assertNotIn("bounced", page.lower())
+
+    def test_stacked_bars_never_pass_100_percent(self):
+        from baton import metricsview
+        html = metricsview.bar([("a", 1, ""), ("b", 1000, "")], 1001, "x")
+        widths = [float(w) for w in re.findall(r"width:([\d.]+)%", html)]
+        self.assertEqual(len(widths), 2)
+        self.assertLessEqual(sum(widths), 100.0)
+
+    def test_ids_fold_past_the_cap(self):
+        from baton import metricsview
+        html = metricsview.ids([f"Q-{i:03d}" for i in range(15)])
+        self.assertIn("<details><summary>+3 more</summary>", html)
+        self.assertIn('href="/e/Q-014"', html)
+        self.assertEqual(metricsview.ids([]), "none")
+
+    def test_sprint_trend_needs_two_sprints(self):
+        self.assertNotIn('class="tline"', serve.metrics_page(self.board(), self.now))  # S1 only
+        b = self.board()
+        b.append_raw({"type": "entry", "id": "Q-080", "kind": "Q", "n": 80, "from": "frontend", "to": ["backend"],
+                      "title": "earlier", "body": "", "files": [], "cites": [], "blocks": [], "ts": "2026-09-01 10:00",
+                      "sprint": "S0"})
+        b.append_raw({"type": "close", "id": "Q-080", "from": "frontend", "reason": "", "ts": "2026-09-01 16:00"})
+        page = serve.metrics_page(self.board(), self.now)
+        self.assertIn('class="tline"', page)
+        self.assertEqual(page.count('class="pt cz"'), 2)  # a close median point per sprint
+        self.assertIn("<small>n=1</small>", page)
 
     def test_entry_and_error_pages_share_the_shell(self):
         code, body, _ = self.get("/e/Q-1")
@@ -163,6 +250,9 @@ class ServeTest(Base):
         self.assertEqual(code, 404)
         self.assertIn('<header class="top">', body)
         self.assertIn("Not found. Try /", body)
+        code, body, _ = self.get("/metrics", method="POST")
+        self.assertEqual(code, 405)
+        self.assertIn('<header class="top">', body)
 
 
     def test_contracts_page(self):
@@ -318,7 +408,11 @@ class EmptyMetricsTest(unittest.TestCase):
         for text in ("No hand-offs yet.", "No sprints yet.", "No events yet.", "no data yet", "nothing posted yet"):
             self.assertIn(text, page)
         self.assertNotIn('class="bar"', page)  # nothing to chart
-        self.assertNotIn("<svg class=\"spark\"", page)
+        self.assertNotIn('class="tline"', page)
+        self.assertNotIn('class="tm"', page)
+        self.assertNotIn('class="kpi t-ok"', page)  # an empty board is not "healthy": zeros stay neutral
+        self.assertIn("<code>baton post Q", page)  # says what to do first
+        self.assertIn("Nothing is blocked, unanswered or stale.", page)
         self.assertIn('aria-current="page">metrics', page)
 
 

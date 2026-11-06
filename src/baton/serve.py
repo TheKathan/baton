@@ -3,7 +3,7 @@
 Routes (GET only; anything else gets 405):
   /                 the board: a kanban of the work, who holds the baton, decisions and recent activity
   /contracts        live contracts by file area (?f=all|new|old|touched)
-  /metrics          board health as a dashboard (metricsview.py): key numbers, times, per-role, per-sprint, per-model
+  /metrics          board health as a dashboard (metricsview.py); ?sprint=<name>|all, default the current sprint
   /e/<id>           one entry with its replies (a sandbox's other tasks: /e/<task>/<id>)
   /api/board.json   open threads and the status table
   /api/metrics.json the same numbers as `baton metrics --json`
@@ -36,20 +36,18 @@ border-radius:10px;padding:14px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,
 """
 
 
-def page(title: str, body: str, board: Board | None = None, now: datetime | None = None) -> str:
+def page(board: Board, title: str, body: str) -> str:
     """A page in the shared shell for the entry and error routes (no board model needed)."""
-    cfg = board.cfg if board is not None else {}
-    project = board.root.name if board is not None else "baton"
-    return boardview.shell(project, boardview.scope_of(cfg), now or datetime.now(), body, title,
+    return boardview.shell(board.root.name, boardview.scope_of(board.cfg), datetime.now(), body, title,
                            foot=f"baton {esc(__version__)}", css=CSS)
 
 
 def error_page(board: Board, message: str) -> str:
-    return page("baton", f'<pre class="md msg">{esc(message)}</pre>', board)
+    return page(board, "baton", f'<pre class="md msg">{esc(message)}</pre>')
 
 
-def metrics_page(board: Board, now: datetime | None = None) -> str:
-    return metricsview.metrics_page(board, now)
+def metrics_page(board: Board, now: datetime | None = None, sprint: str | None = None) -> str:
+    return metricsview.metrics_page(board, now, sprint)
 
 
 def entry_page(board: Board, entry_id: str) -> str:
@@ -63,9 +61,9 @@ def entry_page(board: Board, entry_id: str) -> str:
             raise BoardError(f"no entry {entry_id}")
     else:
         t = board.get(entry_id)
-    return page(f"{t['id']} · baton", f'<div class="ent"><a class="back" href="/">← board</a><h2>{esc(t["id"])}</h2>'
+    return page(board, f"{t['id']} · baton", f'<div class="ent"><a class="back" href="/">← board</a><h2>{esc(t["id"])}</h2>'
                 f'<span class="st">{esc(t["status"])} · {esc(t["sprint"])}</span></div>'
-                f'<pre class="md">{esc(render.entry_md(t))}</pre>{_written_by(t)}', board)
+                f'<pre class="md">{esc(render.entry_md(t))}</pre>{_written_by(t)}')
 
 
 def _written_by(t: dict) -> str:
@@ -118,7 +116,7 @@ def make_handler(board: Board):
                 if path == "/contracts":
                     return self._send(200, boardview.contracts_page(board, parse_qs(url.query).get("f", ["all"])[0]))
                 if path == "/metrics":
-                    return self._send(200, metrics_page(board))
+                    return self._send(200, metrics_page(board, sprint=parse_qs(url.query).get("sprint", [None])[0]))
                 if path == "/api/metrics.json":
                     return self._send(200, json.dumps(metrics.compute(board), indent=2), "application/json")
                 if path == "/api/board.json":
