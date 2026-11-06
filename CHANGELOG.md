@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-06
+
 ### Added
 - `baton sprint` refuses while settled threads of the current sprint are still open (decisions, answered questions, hand-offs), and names them. Run `baton close --sprint <current>` first, or pass `--carry-settled` (MCP: `carry_settled`) to roll over anyway. Rolling over without the close used to carry settled entries into the next sprint as if someone still owed them.
 - `baton sprint` notes when the `orchestrator` role has unread events.
