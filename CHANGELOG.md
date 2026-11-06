@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- `baton sprint` refuses while settled threads of the current sprint are still open (decisions, answered questions, hand-offs), and names them. Run `baton close --sprint <current>` first, or pass `--carry-settled` (MCP: `carry_settled`) to roll over anyway. Rolling over without the close used to carry settled entries into the next sprint as if someone still owed them.
+- `baton sprint` notes when the `orchestrator` role has unread events.
+- `baton post C` notes on stderr when the new contract shares `--files` with a live contract it doesn't supersede, so a correction posted without `--supersedes` doesn't leave two shapes live.
+- The skill's orchestrator section: load the skill yourself, read hand-offs on the board even when agents report back directly, use plain `baton open` as the health check, and the full sprint-close sequence with its expected end state.
+
 ## [1.7.1] - 2026-11-06
 
 ### Fixed

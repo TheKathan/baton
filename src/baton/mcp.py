@@ -87,8 +87,11 @@ TOOLS = [
     _tool("baton_finish", "Sandbox mode: export the task's board to .baton/tasks/<task>.jsonl (commit it with "
           "the PR) and return the PR summary. strict=true fails while questions or blockers are open.",
           {"strict": {"type": "boolean"}}),
-    _tool("baton_sprint", "Orchestrators: archive the current sprint and start a new one.",
-          {"name": {"type": "string", "description": "the new sprint, e.g. S2"}}, ["name"]),
+    _tool("baton_sprint", "Orchestrators: archive the current sprint and start a new one. Refused while settled "
+          "threads of the current sprint are open: run baton_close with sprint first.",
+          {"name": {"type": "string", "description": "the new sprint, e.g. S2"},
+           "carry_settled": {"type": "boolean", "description": "roll over anyway, carrying settled threads"}},
+          ["name"]),
     _tool("baton_metrics", "Board health: answer and close times, stale threads, per-role load.",
           {"sprint": {"type": "string"}, "stale": {"type": "string"}}),
     _tool("baton_lint", "Check the board: duplicate ids, unknown kinds, contracts without files, policies. "
@@ -221,7 +224,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
     if name == "baton_finish":
         return ["finish"] + (["--strict"] if a.get("strict") else [])
     if name == "baton_sprint":
-        return ["sprint", "--", a["name"]]
+        return ["sprint"] + (["--carry-settled"] if a.get("carry_settled") else []) + ["--", a["name"]]
     if name == "baton_metrics":
         out = ["metrics"]
         for key in ("sprint", "stale"):

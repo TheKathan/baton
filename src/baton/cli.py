@@ -158,6 +158,23 @@ def cmd_post(args) -> None:
     print(f"posted {t['id']}" + (f"; closed {', '.join(ids)} as superseded" if ids else ""))
     for w in _long_body_warnings(board, t) + board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
+    for h in _overlap_hints(board, t):
+        print(f"note: {h}", file=sys.stderr)
+
+
+def _overlap_hints(board: Board, t: dict) -> list[str]:
+    """A new contract that shares files with live contracts it doesn't supersede: fine when it adds to
+    them, wrong when it corrects them (two shapes stay live). Only the author can tell, so say so."""
+    if t["kind"] != "C" or not t.get("files"):
+        return []
+    mine = set(t["files"])
+    others = [o for o in board.open_threads(kinds=["C"]) if o["id"] != t["id"] and mine & set(o.get("files") or [])]
+    if not others:
+        return []
+    ids = ", ".join(o["id"] for o in others)
+    return [(f"{t['id']} shares files with live contract(s) {ids}. If it adds to them, nothing to do. If it "
+             f"corrects or replaces one, close that one (`baton close <id> --reason \"superseded by {t['id']}\"`) "
+             "or post with --supersedes next time, so only one shape stays live")]
 
 
 def cmd_reply(args) -> None:
@@ -174,6 +191,16 @@ def _unanswered(t: dict) -> bool:
     return t["kind"] in ("Q", "B") and not any(r["from"] != t["from"] for r in t["replies"])
 
 
+def _sprint_threads(board: Board, sprint: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """A sprint's open threads, split the way `close --sprint` treats them:
+    (unanswered questions and blockers, live contracts, everything else = settled)."""
+    rows = [t for t in board.open_threads() if t["sprint"] == sprint]
+    unanswered = [t for t in rows if _unanswered(t)]
+    contracts = [t for t in rows if t["kind"] == "C"]
+    settled = [t for t in rows if t not in unanswered and t not in contracts]
+    return unanswered, contracts, settled
+
+
 def cmd_close(args) -> None:
     board = _board(args)
     ids = list(args.ids)
@@ -181,10 +208,13 @@ def cmd_close(args) -> None:
         ids += [t["id"] for t in board.open_threads(kinds=["H"]) if t.get("phase") == args.phase
                 and t["id"] not in ids]
     if args.sprint:
-        rows = [t for t in board.open_threads() if t["sprint"] == args.sprint]
-        unanswered = [t for t in rows if _unanswered(t) and not args.include_unanswered]
-        contracts = [t for t in rows if t["kind"] == "C" and not args.include_contracts]
-        ids += [t["id"] for t in rows if t not in unanswered and t not in contracts and t["id"] not in ids]
+        unanswered, contracts, settled = _sprint_threads(board, args.sprint)
+        if args.include_unanswered:
+            settled, unanswered = settled + unanswered, []
+        if args.include_contracts:
+            settled, contracts = settled + contracts, []
+        keep = {t["id"] for t in settled}  # close in board order, as before
+        ids += [t["id"] for t in board.open_threads() if t["id"] in keep and t["id"] not in ids]
         if unanswered:
             print("kept open (unanswered question/blocker; answer it, carry it over, or pass "
                   "--include-unanswered): " + ", ".join(t["id"] for t in unanswered))
@@ -345,6 +375,16 @@ def cmd_sprint(args) -> None:
                          "pass --force if it really is one")
     if args.new == old:
         raise BoardError(f"{old} is already the current sprint")
+    _, _, settled = _sprint_threads(board, old)
+    if settled and not args.carry_settled:
+        # Rolling over without `close --sprint` first carries settled decisions and hand-offs into the
+        # next sprint as if someone still owed them, and `open --blocking` won't show it.
+        raise BoardError(
+            f"{len(settled)} settled thread(s) of {old} are still open: "
+            + ", ".join(t["id"] for t in settled)
+            + f". Close them first with `baton close --sprint {old} --as <role> --reason \"...\"` (it keeps "
+            "unanswered questions, blockers and live contracts open), or pass --carry-settled to carry "
+            "them into the new sprint anyway")
     path = render.render_archive(board, old)
     cfg = config.load(board.root)
     cfg["sprint"] = args.new
@@ -356,6 +396,11 @@ def cmd_sprint(args) -> None:
     if carried:
         print(f"{len(carried)} thread(s) from {old} are still open and listed on the live board: "
               + ", ".join(carried))
+    if "orchestrator" in (board.cfg.get("roles") or []):
+        _, unread = _unread_text(board, "orchestrator", False, True)
+        if unread:
+            print(f"note: orchestrator has {unread} unread event(s) on the board; agents' direct replies "
+                  "don't replace them. Read them with `baton unread --as orchestrator`")
 
 
 def cmd_render(args) -> None:
@@ -847,6 +892,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("sprint", cmd_sprint, "archive the current sprint and start a new one")
     sp.add_argument("new", help="the new sprint's name, e.g. S2")
     sp.add_argument("--force", action="store_true", help="accept a name without digits")
+    sp.add_argument("--carry-settled", action="store_true",
+                    help="roll over even though settled threads of the current sprint are still open "
+                         "(normally run `close --sprint` first)")
 
     sp = add("render", cmd_render, "regenerate the Markdown views")
     sp.add_argument("--archives", action="store_true", help="also re-render every past sprint")
