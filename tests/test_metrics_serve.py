@@ -208,14 +208,21 @@ class BoardViewTest(Base):
         self.add("H", "qa", ["all"], "later")
         self.assertEqual(len(self.ids("pick")), 2)
 
-    def test_in_progress_needs_a_thread_to_link(self):
-        self.b.set_status("frontend", "S1", "working: ui")
-        self.assertEqual(self.model().columns["prog"], [])
+    def test_in_progress_links_a_thread_when_there_is_one(self):
         self.b.set_status("qa", "S1", "testing")
         (card,) = self.model().columns["prog"]
         self.assertEqual((card["role"], card["thread"]["id"]), ("qa", "B-003"))
         self.b.set_status("qa", "S1", "DONE pending QA")
         self.assertEqual(self.model().columns["prog"], [])
+
+    def test_working_without_an_open_thread_still_shows(self):
+        self.b.set_status("frontend", "S1", "working: ui")
+        self.b.set_status("backend", "S0", "working: old sprint")
+        (card,) = self.model().columns["prog"]
+        self.assertEqual((card["role"], card["thread"]), ("frontend", None))
+        page = boardview.board_page(self.board(), self.now)
+        self.assertIn("working: ui", page)
+        self.assertIn("no open thread", page)
 
     def test_open_work_that_changes_a_contracted_file_is_flagged(self):
         c = self.add("C", "backend", ["frontend", "qa"], "orders shape", files=["api/orders.ts"])

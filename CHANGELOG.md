@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Fixed
+- The `baton serve` board shows a role as In progress whenever its status row for the current sprint says it is working, even with no open thread to link (for example, work briefed outside the board). The card reads "no open thread". Such roles used to be left off the kanban.
+
 ## [1.8.0] - 2026-11-06
 
 ### Added
