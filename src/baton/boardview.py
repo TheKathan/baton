@@ -20,7 +20,7 @@ COLUMNS = (
     ("ask", "Needs an answer", "a question nobody has answered"),
     ("ans", "Answered, close it", "the addressee replied"),
     ("pick", "To pick up", "handed off, not picked up yet"),
-    ("prog", "In progress", "working on an open thread"),
+    ("prog", "In progress", "a role reports it is working"),
     ("passed", "Passed on", "recipient moved on, not closed"),
     ("done", "Done", "newest first"),
 )
@@ -330,8 +330,7 @@ class Model:
             if not link and row.get("handoff"):
                 cand = by_id.get(row["handoff"].split()[0])
                 link = cand if cand and cand["status"] == "OPEN" else None
-            if link:
-                cols["prog"].append({"role": role, "row": row, "thread": link})
+            cols["prog"].append({"role": role, "row": row, "thread": link})
         cols["prog"].sort(key=lambda p: p["row"].get("updated") or "", reverse=True)
         return cols
 
@@ -465,10 +464,13 @@ def progress_card(m: Model, p: dict) -> str:
     tone = "bad" if re.match(r"(NEEDS|BLOCK|FAIL)", row["state"], re.IGNORECASE) else ""
     tag = f'<span class="ph">{esc(row["phase"])}</span>' if m.show_phase and row.get("phase") else ""
     updated = metrics.parse_ts(row.get("updated"))
+    head = (f'<div class="hd">{chip(m, p["role"])}{tag}<span class="age">updated {esc(m.ago(updated))} ago</span></div>'
+            f'<div class="st {tone}">{esc(row["state"])}</div>')
+    if not t:  # working with no open thread on the board, e.g. briefed directly
+        return (f'<div class="card prog" title="{esc(p["role"])} · {esc(row["state"])} · no open thread">{head}'
+                f'<div class="ttl muted">no open thread</div></div>')
     return (f'<a class="card prog k-{t["kind"]}" href="/e/{esc(t["id"])}" '
-            f'title="{esc(p["role"])} · {esc(row["state"])} · {esc(t["id"])} {esc(title_of(t))}">'
-            f'<div class="hd">{chip(m, p["role"])}{tag}<span class="age">updated {esc(m.ago(updated))} ago</span></div>'
-            f'<div class="st {tone}">{esc(row["state"])}</div>'
+            f'title="{esc(p["role"])} · {esc(row["state"])} · {esc(t["id"])} {esc(title_of(t))}">{head}'
             f'<div class="ttl"><span class="id">{esc(t["id"])}</span> {esc(title_of(t))}</div></a>')
 
 

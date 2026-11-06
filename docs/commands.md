@@ -340,7 +340,7 @@ The board puts each question, blocker and hand-off of the current sprint (or san
 | Needs an answer | An open question nobody has answered. Its card shows which hand-off it is locking. |
 | Answered, close it | An open question or blocker the addressee replied to. |
 | To pick up | An open hand-off that a recipient has not picked up (has not handed off since). |
-| In progress | A role whose status row is active (not `DONE`, not waiting) and that has an open thread of its own. |
+| In progress | A role whose status row for the current sprint is active (not `DONE`, not waiting). The card links the role's open thread, or says "no open thread" when the work was briefed outside the board. |
 | Passed on | An open hand-off whose recipients have all handed off since. Close it. |
 | Done | Closed questions, blockers and hand-offs, newest first. |
 
