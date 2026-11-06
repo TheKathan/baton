@@ -350,7 +350,7 @@ A card says who must act next. Above the columns, a card per role shows its stat
 |---|---|
 | `/` | The board. |
 | `/contracts` | Live contracts by file area. `?f=new`, `old` or `touched` filters them. In a sandbox it includes the contracts of merged tasks. |
-| `/metrics` | Answer and close times, stale threads, and the load per sprint and per role. |
+| `/metrics` | Board health as a dashboard, for the current sprint by default. `?sprint=all` shows every sprint, `?sprint=<name>` one sprint; an unknown name shows the current sprint, and in a sandbox it always shows the whole task. It has a strip of key numbers (open, blockers, unanswered, stale, median first answer, close rate), a "Needs attention" list of open blockers, unanswered questions and stale threads, who owes answers and the load per role, hand-off outcomes as sender and hold and pickup as receiver, median and p90 answer and close times, every sprint's threads and median times, and events by model. Each chart has a table with the exact numbers. |
 | `/e/<id>` | One entry and its replies. |
 
 | Flag | Meaning |

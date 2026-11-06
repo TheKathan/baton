@@ -55,6 +55,8 @@ outline-offset:2px;border-radius:4px}
 border:1px solid var(--line);color:var(--muted)}.scope b{color:var(--text)}
 .asof{font-size:12px;color:var(--muted)}.nav{margin-left:auto;display:flex;gap:14px;font-size:12.5px}
 .nav a{color:var(--indigo)}.nav a:hover{text-decoration:underline}
+.nav a[aria-current="page"]{color:var(--text);font-weight:650;text-decoration:underline;
+text-decoration-color:var(--orange);text-decoration-thickness:2px;text-underline-offset:5px}
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:0 7px;line-height:18px;
 border-radius:999px;color:var(--rc);background:color-mix(in srgb,var(--rc) 13%,transparent);white-space:nowrap;
 font-weight:550;min-width:62px;flex:0 1 auto}
@@ -172,6 +174,7 @@ text-overflow:ellipsis}
 .crisk{display:inline-block;margin-top:3px;font-size:11px;font-weight:650;color:var(--warn)}
 footer{margin-top:14px;padding:12px 0 18px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
 @media (max-width:1100px){.board{overflow-x:auto}.records{grid-template-columns:1fr}}
+@media (max-width:640px){.nav a{display:inline-flex;align-items:center;min-height:24px;padding:3px 2px}}
 """
 
 
@@ -230,7 +233,7 @@ class Model:
     """What the board shows, decided once: which column each thread is in, who holds what, what touches what."""
 
     def __init__(self, board: Board, now: datetime | None = None):
-        cfg = board.cfg
+        self.cfg = cfg = board.cfg
         self.now = now or datetime.now()
         self.sandbox = bool(cfg.get("sandbox"))
         self.sprint, self.task = cfg["sprint"], cfg.get("task", "")
@@ -558,19 +561,37 @@ def contracts_html(m: Model, filt: str) -> str:
     return nav + f'<div class="cpage">{"".join(out)}</div>'
 
 
-def document(project: str, m: Model, body: str, title: str) -> str:
-    scope = (f"task <b>{esc(m.task)}</b> · sandbox" if m.sandbox else f"sprint <b>{esc(m.sprint)}</b>")
+NAV = (("board", "/"), ("contracts", "/contracts"), ("metrics", "/metrics"))
+BOARD_FOOT = ('cards open <code>/e/&lt;id&gt;</code> · a hand-off is refused while a question to that role has no '
+              'answer · Q question, B blocker, H hand-off are work; decisions and contracts are records')
+
+
+def scope_of(cfg: dict) -> str:
+    """The scope pill's HTML: the sandbox task, or the current sprint."""
+    return (f"task <b>{esc(cfg.get('task', ''))}</b> · sandbox" if cfg.get("sandbox")
+            else f"sprint <b>{esc(cfg.get('sprint', ''))}</b>")
+
+
+def shell(project: str, scope: str, now: datetime, body: str, title: str, current: str = "",
+          foot: str = BOARD_FOOT, css: str = "") -> str:
+    """The page every `baton serve` route shares: top bar, nav with the current page marked, body, footer.
+
+    `scope` and `foot` are trusted HTML built from escaped values; `css` adds a page's own rules."""
+    nav = "".join(f'<a href="{href}"' + (' aria-current="page"' if name == current else "") + f">{name}</a>"
+                  for name, href in NAV)
     head = (f'<header class="top"><div class="wrap"><h1><b>baton</b> · {esc(project)}</h1><span class="scope">{scope}'
-            f'</span><span class="asof">updated {m.now:%H:%M} · read-only</span>'
-            '<span class="nav"><a href="/">board</a><a href="/contracts">contracts</a><a href="/metrics">metrics</a>'
-            '</span></div></header>')
-    foot = ('<footer>baton serve · read-only · refreshes every 30 s · cards open <code>/e/&lt;id&gt;</code> · a '
-            'hand-off is refused while a question to that role has no answer · Q question, B blocker, H hand-off '
-            'are work; decisions and contracts are records</footer>')
+            f'</span><span class="asof">updated {now:%H:%M} · read-only</span>'
+            f'<nav class="nav" aria-label="Pages">{nav}</nav></div></header>')
+    tail = f'<footer>baton serve · read-only · refreshes every 30 s{" · " + foot if foot else ""}</footer>'
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
             f'content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30">'
-            f'<title>{esc(title)}</title><style>{CSS}</style></head><body>{head}<div class="wrap">{body}{foot}'
+            f'<title>{esc(title)}</title><style>{CSS}{css}</style></head><body>{head}<div class="wrap">{body}{tail}'
             '</div></body></html>')
+
+
+def document(project: str, m: Model, body: str, title: str, current: str = "board",
+             foot: str = BOARD_FOOT, css: str = "") -> str:
+    return shell(project, scope_of(m.cfg), m.now, body, title, current, foot, css)
 
 
 def board_page(board: Board, now: datetime | None = None) -> str:
@@ -580,4 +601,4 @@ def board_page(board: Board, now: datetime | None = None) -> str:
 
 def contracts_page(board: Board, filt: str = "all", now: datetime | None = None) -> str:
     m = Model(board, now)
-    return document(board.root.name, m, contracts_html(m, filt), f"contracts · {board.root.name}")
+    return document(board.root.name, m, contracts_html(m, filt), f"contracts · {board.root.name}", "contracts")
