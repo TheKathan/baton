@@ -9,6 +9,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Questions to a role with no running agent no longer show only as stale. An open Q/B with no answer whose every named role shows `DONE` (or has no status row) and has written nothing for the stale time is listed in `baton metrics` ("Idle addressee", JSON `summary.idle_addressees`), in a "To an idle role" group under Needs attention on `/metrics`, and in a `baton sprint` note on stderr.
 - Work dispatched outside the board is now flagged. When the current sprint has hand-offs to the orchestrator but none from it, `baton metrics` and the `/metrics` hand-offs panel suggest posting `baton handoff --as orchestrator --to <role>` at dispatch, so To pick up and In progress fill. JSON: `dispatch`.
 - The skill: at dispatch the orchestrator posts a hand-off per brief and has builders set their status to working; fix rounds pass `--fixes`.
+- On Python 3.11, a body after a `--` separator (`baton post Q … -- "text"`) was refused as "unrecognized arguments". Words after `--` are now always body text, even when they start with `-`.
 
 ## [1.9.0] - 2026-11-06
 

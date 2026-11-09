@@ -64,6 +64,14 @@ class BoardTest(unittest.TestCase):
         self.assertIn("| C-002 | backend → frontend, qa | Health shape | a.ts; b.ts | S1 | OPEN |",
                       (self.root / ".baton/CONTRACTS-INDEX.md").read_text())
 
+    def test_body_after_a_double_dash_separator(self):
+        # Python < 3.12 leaves "--" and what follows to the leftover handling; both must read as body.
+        self.assertIn("posted Q-001", run("post", "Q", "--as", "backend", "--to", "frontend",
+                                          "--title", "Which route?", "--", "body", "-v", "text"))
+        self.assertEqual(self.board().get("Q-001")["body"], "body -v text")
+        with self.assertRaises(SystemExit):  # an unknown flag before "--" is still refused
+            run("post", "Q", "--as", "backend", "--to", "frontend", "--title", "t", "--nope", "--", "x")
+
     def test_validation(self):
         with self.assertRaises(SystemExit):
             run("post", "C", "--as", "backend", "--title", "no files", "x")

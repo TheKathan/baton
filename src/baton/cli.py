@@ -1001,7 +1001,13 @@ def main(argv: list[str] | None = None) -> None:
     # as unrecognised, so message words that argparse left over are joined back into the body.
     args, extra = parser.parse_known_args(argv)
     if extra:
-        flags = [x for x in extra if x.startswith("-") and x != "-"]
+        # Words after a "--" separator are body text, even when they start with "-".
+        head, sep, tail = (extra[:extra.index("--")], True, extra[extra.index("--") + 1:]) if "--" in extra \
+            else (extra, False, [])
+        extra = head + tail
+        flags = [x for x in head if x.startswith("-") and x != "-"]
+        if sep and not hasattr(args, "body"):
+            flags.append("--")
         if flags or not hasattr(args, "body"):
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
         args.body = (args.body or []) + extra
