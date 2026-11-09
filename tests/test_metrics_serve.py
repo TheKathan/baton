@@ -216,7 +216,8 @@ class ServeTest(Base):
         b.append_raw({"type": "close", "id": "H-070", "from": "qa", "reason": "", "ts": "2026-10-05 09:30",
                       "outcome": "accepted"})
         page = serve.metrics_page(self.board(), self.now)
-        self.assertIn('<th class="grp" scope="colgroup" colspan="6">As sender</th>', page)
+        self.assertIn('<th class="grp" scope="colgroup" colspan="7">As sender</th>', page)
+        self.assertIn("Fixed later", page)
         self.assertIn("As receiver", page)
         self.assertIn("Cited later", page)
         self.assertIn('<i class="s-acc" style="width:100.0%"', page)  # 1 of 1 sent accepted fills the bar

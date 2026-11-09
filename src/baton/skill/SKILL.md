@@ -62,6 +62,7 @@ EOF
 - **baton refuses the hand-off** while a question addressed to you is unanswered, or when the body is over the project's limit (20 lines by default). Nothing is posted in that case. Answer the question (`baton show Q-…`, then `baton reply Q-… --as <role> --close "…"`) or shorten the body, and rerun. Use `--force` only when the rule truly doesn't apply, and give the reason in the body.
 - **If baton notes threads of yours that someone has replied to,** close the settled ones.
 - **Post a hand-off whenever you finish** a piece of work others will pick up, including a contract change. That is what keeps `STATUS.md` true.
+- **On a fix round,** pass `--fixes <the hand-off you're fixing>` (`--fixes H-150`), so metrics count the earlier hand-off as fixed later.
 
 ## In a sandbox
 When each issue runs in its own sandbox, the board belongs to the task. Start with `baton init --sandbox --task <issue id>` (it resumes the task's earlier board if the branch has one), read `baton brief --as <role>`, which also lists the live contracts of already merged tasks, and check `baton contracts --paths '<your paths>'` before you change shared files. When you're done, run `baton finish` and commit `.baton/tasks/<task>.jsonl` with your PR; put the printed summary in the PR description or a comment.
@@ -75,6 +76,8 @@ When each issue runs in its own sandbox, the board belongs to the task. Start wi
 - **Agents' replies don't replace the board.** When an agent reports back to you directly, still read its hand-off with `baton unread --as orchestrator` (or `baton show H-…`) before acting on it, and close it once you've checked the work.
 - **Set up** a project with `baton init --roles orchestrator,backend,frontend,qa`. Commit `.baton/config.json` and `.baton/events/`; the `.md` views are generated from them.
 - **Brief each agent** with its role, the exact entry ids to read, "start with `baton brief --as <role>`", and "pass `--as <role>` on every baton command".
+- **At dispatch, post one `baton handoff --as orchestrator --to <role>` per brief**, so the board shows the work, and tell builders to set `baton status --as <role> --state working` when they start.
+- **When a later gate finds bugs in a hand-off you already accepted,** launch the fix round with "pass `--fixes H-…` on your hand-off".
 - **Track the work** with `baton open --blocking` (what stops work now), `baton open` (the real health check: everything still owed), `baton status` and `baton lint`. Record rulings as `D` entries or as replies.
 - **Close a phase** after its gate passes: `baton close --phase S6-A --as orchestrator --reason "S6-A passed QA"` closes that phase's hand-offs.
 - **Close a sprint** after its gate passes:

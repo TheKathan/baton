@@ -203,6 +203,11 @@ def defs(stale_h: str) -> dict[str, str]:
                  "count as quiet instead.",
         "quiet": f"An open contract nobody has replied to or cited for {stale_h}. Still in force? Supersede or close it.",
         "cited": "Threads by other roles that cite a hand-off this role sent. Any citation counts, not only rework.",
+        "fixed": "Hand-offs this role sent that a later hand-off names with --fixes: a fix round found after "
+                 "the receiver judged it. Accepted and rework stay the receiver's own verdict.",
+        "idle": f"An open question or blocker with no answer whose every named role shows DONE (or has no status "
+                f"row) and has written nothing for {stale_h}: no agent is running to answer it. Answer, reassign "
+                "or close it.",
         "refused": "Posts and hand-offs baton refused, from this checkout's local log, not the shared board.",
         "unread": "Events after each role's read cursor. Cursors live in this checkout, so other checkouts differ.",
         "tokens": "About 4 characters per token: roughly what an agent spends to read that text.",
@@ -247,8 +252,8 @@ def attention_item(view: Model, t: dict) -> str:
 
 
 def attention(view: Model, att: dict[str, list[dict]]) -> str:
-    groups = (("blocked", "Blocked", "bad"), ("unanswered", "Unanswered questions and blockers", "warn"),
-              ("stale", "Stale", "warn"))
+    groups = (("blocked", "Blocked", "bad"), ("idle", "To an idle role", "warn"),
+              ("unanswered", "Unanswered questions and blockers", "warn"), ("stale", "Stale", "warn"))
     if not any(att.values()):
         return panel("Needs attention", "open blockers, unanswered questions and stale threads in this scope",
                      '<div class="empty">Nothing is blocked, unanswered or stale.</div>', "attention")
@@ -376,16 +381,27 @@ def handoffs(m: dict, view: Model, d: dict) -> str:
         viz = (bar(parts, top, f'{r}: ' + ", ".join(t for _, _, t in parts)) if x["handoffs_sent"]
                else '<span class="muted">none sent</span>')
         rows.append([("", chip(view, r)), ("vz", viz), num(x["handoffs_sent"]), num(x["accepted"]), num(x["rework"]),
-                     num(x["bounced"]), num(x["refused"]), num(x["forced"]), num(hrs(x["hours_held"])),
-                     num(hrs(x["hours_to_pickup"]))])
+                     num(x.get("fixed_later", 0), "t-warn" if x.get("fixed_later") else ""), num(x["bounced"]),
+                     num(x["refused"]), num(x["forced"]), num(hrs(x["hours_held"])), num(hrs(x["hours_to_pickup"]))])
     heads = [("", "Role", ""), ("vz", "Outcomes", "Sent hand-offs: accepted, rework, not judged yet."),
-             ("num", "Sent", ""), ("num", "Accepted", ""), ("num", "Rework", ""), ("num", "Cited later", d["cited"]),
+             ("num", "Sent", ""), ("num", "Accepted", ""), ("num", "Rework", ""), ("num", "Fixed later", d["fixed"]),
+             ("num", "Cited later", d["cited"]),
              ("num", "Refused", d["refused"]), ("num", "Forced", "Hand-offs pushed through with --force."),
              ("num", "Median hold", d["hold"]), ("num", "Median pickup", d["pickup"])]
-    groups = ('<tr><td></td><td class="vz"></td><th class="grp" scope="colgroup" colspan="6">As sender</th>'
+    groups = ('<tr><td></td><td class="vz"></td><th class="grp" scope="colgroup" colspan="7">As sender</th>'
               '<th class="grp" scope="colgroup" colspan="2">As receiver</th></tr>')
     legend = key([("s-acc", "accepted"), ("s-rew", "rework"), ("s-und", "not judged yet")]) if top else ""
-    return panel("Hand-offs by role", hint, legend + table(heads, rows, groups))
+    return panel("Hand-offs by role", hint, legend + table(heads, rows, groups) + dispatch_note(m))
+
+
+def dispatch_note(m: dict) -> str:
+    d = m.get("dispatch") or {}
+    if not d.get("off_board"):
+        return ""
+    return ('<p class="muted dispatch">Builders hand work to the orchestrator, but it has posted no hand-off to '
+            f'them in {esc(d["sprint"])}: they seem to be briefed outside the board. Posting '
+            "<code>baton handoff --as orchestrator --to &lt;role&gt;</code> at dispatch fills To pick up and "
+            "In progress.</p>")
 
 
 SERIES = (("fa", "hours_to_first_answer", "median first answer"), ("cz", "hours_to_close", "median close"))
@@ -470,7 +486,7 @@ def by_model(m: dict, view: Model) -> str:
 
 def glossary(d: dict) -> str:
     terms = [("Owes answers", d["owes"]), ("Stale", d["stale"]), ("Quiet contract", d["quiet"]),
-             ("Cited later", d["cited"]), ("Median hold", d["hold"]), ("Median pickup", d["pickup"]),
+             ("To an idle role", d["idle"]), ("Fixed later", d["fixed"]), ("Cited later", d["cited"]), ("Median hold", d["hold"]), ("Median pickup", d["pickup"]),
              ("Refused writes", d["refused"]), ("Unread", d["unread"]), ("~tokens", d["tokens"]), ("p90", d["p90"])]
     body = "".join(f"<dt>{esc(t)}</dt><dd>{esc(x)}</dd>" for t, x in terms)
     return panel("How to read this", "times are hours between events; every number is also in baton metrics",
@@ -500,7 +516,9 @@ def attention_lists(board: Board, view: Model, m: dict, scope: str | None) -> di
     open_ = [t for t in board.entries().values() if t["status"] == "OPEN" and (scope is None or t["sprint"] == scope)]
     open_.sort(key=lambda t: -(view.hours(t) or 0))
     stale = set(m["summary"]["stale_ids"])
+    idle = {x["id"] for x in m["summary"].get("idle_addressees") or []}
     return {"blocked": [t for t in open_ if t["kind"] == "B" or t.get("blocks")],
+            "idle": [t for t in open_ if t["id"] in idle],
             "unanswered": [t for t in open_ if t["kind"] in ("Q", "B") and not metrics.first_answer(t)],
             "stale": [t for t in open_ if t["id"] in stale]}
 
