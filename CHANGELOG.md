@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-09
+
 ### Fixed
 - Rework found after a hand-off was accepted is no longer invisible. `baton handoff --fixes H-…` (MCP: `fixes`) names the earlier hand-offs a fix round fixes; each must be a hand-off. They are stored as an optional `fixes` field and added to `cites`, and the earlier hand-offs are left unchanged. `baton metrics`, `/api/metrics.json` and the `/metrics` hand-offs table ("As sender") count `fixed_later` per role. `accepted` and `rework` stay the receiver's verdict.
 - Questions to a role with no running agent no longer show only as stale. An open Q/B with no answer whose every named role shows `DONE` (or has no status row) and has written nothing for the stale time is listed in `baton metrics` ("Idle addressee", JSON `summary.idle_addressees`), in a "To an idle role" group under Needs attention on `/metrics`, and in a `baton sprint` note on stderr.
