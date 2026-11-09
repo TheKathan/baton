@@ -70,6 +70,7 @@ TOOLS = [
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"},
            "to": _STRS, "title": {"type": "string"}, "body": {"type": "string"},
            "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"},
+           "fixes": {**_IDS, "description": "on a fix round: the earlier hand-offs whose work this fixes"},
            "model": _MODEL},
           ["phase", "state", "to", "title", "body"]),
     _tool("baton_status", "The status table: one row per role. Pass role and state to set your own row.",
@@ -198,7 +199,7 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
     if name == "baton_handoff":
         out = ["handoff", *role, _opt("phase", a["phase"]), _opt("state", a["state"]), _opt("to", _csv(a["to"])),
                _opt("title", a["title"]), _opt("body-file", body_file)]
-        for key in ("files", "cites", "closes"):
+        for key in ("files", "cites", "closes", "fixes"):
             if a.get(key):
                 out.append(_opt(key, _csv(a[key])))
         return out + _model(a) + (["--force"] if a.get("force") else [])

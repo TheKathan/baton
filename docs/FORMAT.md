@@ -77,6 +77,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | `files`, `cites`, `blocks` | arrays of strings | Affected files (required for `C`), cited ids, and what the entry blocks |
 | `phase` | string | Optional (baton ≥ 1.3): on `H` entries, the `--phase` of the hand-off |
 | `state` | string | Optional (baton ≥ 1.6): on `H` entries, the `--state` of the hand-off, for example `DONE pending QA` |
+| `fixes` | array of strings | Optional (baton ≥ 1.9.1): on `H` entries, the earlier hand-offs whose work this fix round fixes (`handoff --fixes`). They are also in `cites`; the earlier hand-offs are not changed |
 | `supersedes` | array of strings | Optional (baton ≥ 1.3): on `C` entries, the contracts this one replaces. baton closes them in the same command |
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |

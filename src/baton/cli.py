@@ -303,6 +303,22 @@ def cmd_open(args) -> None:
     print(f"{len(rows)} open{hidden}")
 
 
+def _fixes(board: Board, ids: list[str]) -> list[str]:
+    """The canonical ids of the earlier hand-offs a fix round names; refuses anything else."""
+    out = []
+    for i in ids:
+        try:
+            thread = board.get(i)
+        except BoardError:
+            raise BoardError(f"--fixes {i}: no such entry; name the earlier hand-off this round fixes") from None
+        if thread["kind"] != "H":
+            raise BoardError(f"--fixes {thread['id']}: not a hand-off (it is a {thread['kind']}); "
+                             "name the earlier hand-off whose work this round fixes")
+        if thread["id"] not in out:
+            out.append(thread["id"])
+    return out
+
+
 def cmd_handoff(args) -> None:
     board = _board(args)
     role, body = _role(args), _body(args)
@@ -325,13 +341,16 @@ def cmd_handoff(args) -> None:
                     '--close "…"')
         raise BoardError("hand-off refused:\n  - " + "\n  - ".join(problems) + hint
                          + "\n  (or hand off anyway with --force and the reason in the body)")
-    # resolve --closes before writing anything, so a bad id never leaves a half-done hand-off behind
+    # resolve --fixes and --closes before writing anything, so a bad id never leaves a half-done hand-off behind
+    fixes = _fixes(board, _csv(args.fixes))
+    cites = _csv(args.cites)
+    cites += [i for i in fixes if i not in cites]
     to_close, already = [], []
     for i in _csv(args.closes):
         thread = board.get(i)
         (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
-    t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), _csv(args.cites),
-                   phase=args.phase, state=args.state)
+    t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), cites,
+                   phase=args.phase, state=args.state, fixes=fixes)
     for w in board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
@@ -401,6 +420,14 @@ def cmd_sprint(args) -> None:
         if unread:
             print(f"note: orchestrator has {unread} unread event(s) on the board; agents' direct replies "
                   "don't replace them. Read them with `baton unread --as orchestrator`")
+    from datetime import datetime
+
+    from . import metrics  # lazy: metrics imports this module
+    idle = metrics.idle_addressees(board, board.open_threads(), datetime.now(), metrics.STALE_DEFAULT_HOURS)
+    if idle:
+        print(f"note: {len(idle)} open question(s) wait on a role with no running agent (status DONE, nothing "
+              f"written for {metrics.STALE_DEFAULT_HOURS:g}h): {metrics.idle_text(idle)}. Answer, reassign or "
+              "close them", file=sys.stderr)
 
 
 def cmd_render(args) -> None:
@@ -881,6 +908,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--files")
     sp.add_argument("--cites")
     sp.add_argument("--closes", help="comma-separated threads this hand-off settles")
+    sp.add_argument("--fixes", help="comma-separated earlier hand-offs whose work this fix round fixes")
     sp.add_argument("--force", action="store_true")
     body(sp)
 
