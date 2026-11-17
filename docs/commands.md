@@ -163,6 +163,8 @@ baton: hand-off refused:
   (or hand off anyway with --force and the reason in the body)
 ```
 
+After posting, baton notes the `D`, `Q` and `B` you posted that are still open, other than those in `--closes` or `--keep-open`. Contracts (`C`) and hand-offs (`H`) are never listed. With `"handoff_own_open": "require"` in the config the hand-off is refused instead, and the message says to pass `--closes` or `--keep-open ID:reason`.
+
 | Flag | Meaning |
 |---|---|
 | `--as ROLE` | Your role. |
@@ -172,6 +174,7 @@ baton: hand-off refused:
 | `--title TEXT` | Required. |
 | `--files FILES`, `--cites IDS` | Affected files; cited ids. |
 | `--closes IDS` | Threads this hand-off settles, for example the hand-offs to you that you checked. |
+| `--keep-open ID:reason` | Repeatable. A `D`, `Q` or `B` you posted that stays open on purpose, with the reason (who owes what). Stored on the hand-off as `keeps_open`. |
 | `--fixes IDS` | On a fix round: the earlier hand-offs whose work this one fixes. Each must be a hand-off. baton stores them as `fixes` and adds them to `cites`; the earlier hand-offs are left as they are. `baton metrics` counts them as *fixed later* for their sender. |
 | `--force` | Hand off despite the refusal. Give the reason in the body. |
 | `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |

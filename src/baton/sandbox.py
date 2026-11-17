@@ -24,7 +24,8 @@ from .store import NAME_RE, Board, BoardError, fold
 TASK_RE = NAME_RE
 LOCAL_PATHS = (f"/{config.SANDBOX_NAME}", f"/{config.BATON_DIR}/sandbox/")
 # Team settings a sandbox board takes from the project's committed .baton/config.json.
-INHERITED = ("policies", "kinds", "handoff_max_lines", "body_warn_lines", "unread_warn_tokens", "id_width")
+INHERITED = ("policies", "kinds", "handoff_max_lines", "handoff_own_open", "body_warn_lines",
+             "unread_warn_tokens", "id_width")
 
 
 def task_file(root: Path, task: str) -> Path:

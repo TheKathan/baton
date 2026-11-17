@@ -12,6 +12,7 @@ baton reads its settings from `.baton/config.json` at the project root. Keys you
 | `roles` | `[]` | The allowed role names. An empty list allows any role. |
 | `kinds` | `{"Q": "question", "C": "contract change", "D": "decision", "H": "hand-off", "B": "blocker"}` | Entry kinds and their names. |
 | `handoff_max_lines` | `20` | The longest hand-off body baton accepts. Longer ones are refused. |
+| `handoff_own_open` | `"warn"` | What `baton handoff` does about open `D`/`Q`/`B` entries the sender posted. `"warn"` lists them in a note. `"require"` refuses the hand-off until each is closed with `--closes` or kept open with `--keep-open ID:reason`. |
 | `body_warn_lines` | `{"C": 40, "D": 40}` | Per-kind body length that triggers a warning. |
 | `unread_warn_tokens` | `20000` | `unread` notes when its output passes this many tokens. `0` turns the note off. |
 | `id_width` | `3` | Digits in ids: `Q-001`. |
@@ -51,7 +52,7 @@ A small config:
 | `auto_render` | `false` |
 | `shared_worktrees` | `false` |
 
-If the checkout has a `.baton/config.json`, the sandbox copies the team's settings from it when it is created: `policies`, `kinds`, `roles` (unless you pass `--roles`), `handoff_max_lines`, `body_warn_lines`, `unread_warn_tokens` and `id_width`. Every other key keeps its default, and you can still edit the copy in `sandbox.json`. It lives only in this checkout (it is listed in `.git/info/exclude`). A checkout with a `sandbox.json` uses it instead of `config.json`, and it is never redirected to another worktree. See [Sandbox mode](sandbox.md).
+If the checkout has a `.baton/config.json`, the sandbox copies the team's settings from it when it is created: `policies`, `kinds`, `roles` (unless you pass `--roles`), `handoff_max_lines`, `handoff_own_open`, `body_warn_lines`, `unread_warn_tokens` and `id_width`. Every other key keeps its default, and you can still edit the copy in `sandbox.json`. It lives only in this checkout (it is listed in `.git/info/exclude`). A checkout with a `sandbox.json` uses it instead of `config.json`, and it is never redirected to another worktree. See [Sandbox mode](sandbox.md).
 
 ## Environment variables
 
