@@ -4,6 +4,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- `baton handoff` lists the D, Q and B you posted that are still open and not closed by this hand-off's `--closes` (contracts and hand-offs are left out), so settled decisions get closed instead of staying open as a record. `--keep-open ID:reason` (repeatable; MCP: `keep_open`) marks one as open on purpose and records the reason on the hand-off as an optional `keeps_open` field.
+- Project setting `handoff_own_open` in `.baton/config.json`: `"warn"` (default, a note only) or `"require"`, which refuses the hand-off until every own open D/Q/B is closed with `--closes` or listed with `--keep-open` (`--force` still overrides).
+
+### Changed
+- The skill: a `D` is settled once it is implemented (cite the H) or recorded in code or docs, and its poster closes it, including a `D` addressed to `all`. Close what you settled before handing off. The orchestrator closes the D/B a hand-off implements when accepting it, and records a deferral as a `D` citing the `Q` rather than replying to the `Q`, because `close --sprint` closes replied-to questions. A denied tool or action is reported, not worked around.
+
 ## [1.9.1] - 2026-11-09
 
 ### Fixed

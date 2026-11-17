@@ -33,6 +33,7 @@ Read at three moments only: (1) at start, (2) before you change a shared package
   baton close Q-231 --as <role> [--reason ..] close a thread you settled
   baton handoff --as <role> --phase S6-B --state "DONE pending QA" --to qa --title "..." -
       [--closes H-150]                        settle what this hand-off answers (e.g. the hand-offs you checked)
+      [--keep-open D-004:"why"]               a D/Q/B of yours that stays open on purpose
 
 Kinds: Q question · C contract change (needs --files) · D decision · H hand-off · B blocker.
 Blocked? post a B and tell the orchestrator directly.
@@ -319,6 +320,26 @@ def _fixes(board: Board, ids: list[str]) -> list[str]:
     return out
 
 
+def _keep_open(board: Board, role: str, specs: list[str], skip: set[str]) -> list[dict]:
+    """Parse repeated `--keep-open ID:reason`; each id must be one of the sender's own open threads."""
+    own = {t["id"] for t in board.own_open(role)} - skip
+    out = []
+    for spec in specs:
+        tid, _, reason = spec.partition(":")
+        tid, reason = tid.strip(), reason.strip()
+        if not tid or not reason:
+            raise BoardError(f"--keep-open {spec!r}: write ID:reason, e.g. --keep-open D-004:\"waits for S2\"")
+        tid = board.get(tid)["id"]
+        if tid in skip:
+            continue  # this hand-off closes it, so there is nothing to keep open
+        if tid not in own:
+            raise BoardError(f"--keep-open {tid}: not an open D, Q or B that you posted "
+                             f"(yours: {', '.join(sorted(own)) or 'none'})")
+        if all(k["id"] != tid for k in out):
+            out.append({"id": tid, "reason": reason})
+    return out
+
+
 def cmd_handoff(args) -> None:
     board = _board(args)
     role, body = _role(args), _body(args)
@@ -349,8 +370,25 @@ def cmd_handoff(args) -> None:
     for i in _csv(args.closes):
         thread = board.get(i)
         (already if thread["status"] == "CLOSED" else to_close).append(thread["id"])
+    mode = board.cfg.get("handoff_own_open", "warn")
+    if mode not in ("warn", "require"):
+        raise BoardError(f"handoff_own_open in .baton/config.json must be \"warn\" or \"require\", not {mode!r}")
+    kept = _keep_open(board, role, args.keep_open or [], set(to_close))
+    kept_ids = {k["id"] for k in kept}
+    loose = [t for t in board.own_open(role) if t["id"] not in set(to_close) | kept_ids]
+    if loose and mode == "require":
+        ids = [t["id"] for t in loose]
+        board.log_refusal("handoff", role, "H", args.title, ["own open threads: " + ", ".join(ids)], [],
+                          forced=bool(args.force))
+        if not args.force:
+            raise BoardError("hand-off refused (handoff_own_open is \"require\"):\n  - you posted threads that "
+                             "are still open: " + ", ".join(ids)
+                             + f"\n  close the settled ones: --closes {','.join(ids)}"
+                             "\n  or keep one open on purpose: "
+                             f"--keep-open {ids[0]}:\"why, and who owes what\" (repeatable)"
+                             "\n  (or hand off anyway with --force and the reason in the body)")
     t = board.post("H", role, _csv(args.to), args.title, body, _csv(args.files), cites,
-                   phase=args.phase, state=args.state, fixes=fixes)
+                   phase=args.phase, state=args.state, fixes=fixes, keeps_open=kept)
     for w in board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
@@ -364,6 +402,11 @@ def cmd_handoff(args) -> None:
     if not board.who_wrote():
         print("note: no model recorded; pass --model <your model id> (or set $BATON_MODEL) so metrics can "
               "tell models apart", file=sys.stderr)
+    if loose:
+        print("note: you posted these and they are still open; close any that are settled "
+              f"(`baton close <id> --as {role} --reason …`, or `--closes` next time), or keep one open on "
+              "purpose with `--keep-open ID:reason`: "
+              + ", ".join(f"{x['id']} ({x['title'][:50]})" for x in loose))
     received = [h for h in board.handoffs_to(role) if h["id"] not in to_close]
     if received:
         print("note: hand-offs to you are still open; if this hand-off settles them, close them "
@@ -909,6 +952,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--cites")
     sp.add_argument("--closes", help="comma-separated threads this hand-off settles")
     sp.add_argument("--fixes", help="comma-separated earlier hand-offs whose work this fix round fixes")
+    sp.add_argument("--keep-open", action="append", metavar="ID:reason",
+                    help="a D/Q/B you posted that stays open on purpose, with the reason (repeatable)")
     sp.add_argument("--force", action="store_true")
     body(sp)
 

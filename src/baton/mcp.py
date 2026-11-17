@@ -66,11 +66,15 @@ TOOLS = [
            "outcome": {"type": "string", "enum": ["accepted", "rework"],
                        "description": "with hand-off ids: judge the work you received (rework: it came back wrong)"}}),
     _tool("baton_handoff", "Hand off finished work (at most 20 lines) and update your status row. "
-          "Refused while a question addressed to you is unanswered.",
+          "Refused while a question addressed to you is unanswered. Notes your own open D/Q/B "
+          "(close them with closes, or keep_open with a reason); refused on them if the project sets "
+          "handoff_own_open to require.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"},
            "to": _STRS, "title": {"type": "string"}, "body": {"type": "string"},
            "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"},
            "fixes": {**_IDS, "description": "on a fix round: the earlier hand-offs whose work this fixes"},
+           "keep_open": {**_STRS, "description": "D/Q/B you posted that stay open on purpose, each as "
+                                                 "\"ID:reason\" (who owes what)"},
            "model": _MODEL},
           ["phase", "state", "to", "title", "body"]),
     _tool("baton_status", "The status table: one row per role. Pass role and state to set your own row.",
@@ -202,6 +206,8 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
         for key in ("files", "cites", "closes", "fixes"):
             if a.get(key):
                 out.append(_opt(key, _csv(a[key])))
+        for spec in a.get("keep_open") or []:
+            out.append(_opt("keep-open", spec))
         return out + _model(a) + (["--force"] if a.get("force") else [])
     if name == "baton_status":
         if a.get("state"):

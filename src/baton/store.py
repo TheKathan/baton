@@ -282,7 +282,8 @@ class Board:
 
     def post(self, kind: str, author: str, to: list[str], title: str, body: str,
              files: list[str] = (), cites: list[str] = (), blocks: list[str] = (),
-             phase: str = "", supersedes: list[str] = (), state: str = "", fixes: list[str] = ()) -> dict:
+             phase: str = "", supersedes: list[str] = (), state: str = "", fixes: list[str] = (),
+             keeps_open: list[dict] = ()) -> dict:
         kind = kind.upper()
         if kind not in self.cfg["kinds"]:
             raise BoardError(f"unknown kind {kind!r}; known: {', '.join(self.cfg['kinds'])}")
@@ -306,6 +307,8 @@ class Board:
             entry["supersedes"] = list(supersedes)
         if fixes:
             entry["fixes"] = list(fixes)
+        if keeps_open:
+            entry["keeps_open"] = [dict(k) for k in keeps_open]
         refusals, self.last_warnings = policies.check(self.cfg.get("policies"), entry)
         if refusals:
             self.log_refusal("policy", author, kind, title, refusals)
@@ -407,6 +410,11 @@ class Board:
         """Open threads the role started that someone else has since replied to: probably settled."""
         return [t for t in self.open_threads(role) if t["from"] == role
                 and t["kind"] in ("Q", "B") and any(r["from"] != role for r in t["replies"])]
+
+    def own_open(self, role: str) -> list[dict]:
+        """Open D, Q and B threads the role posted. Contracts (C) and hand-offs (H) are not listed:
+        contracts stay live by design, and hand-offs are closed by their receivers."""
+        return [t for t in self.open_threads(kinds=["D", "Q", "B"]) if t["from"] == role]
 
     def handoffs_to(self, role: str) -> list[dict]:
         """Open hand-offs addressed to the role by name, from someone else."""

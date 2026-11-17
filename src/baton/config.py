@@ -30,6 +30,7 @@ DEFAULTS: dict = {
     },
     "roles": [],
     "handoff_max_lines": 20,
+    "handoff_own_open": "warn",
     "body_warn_lines": {"C": 40, "D": 40},
     "unread_warn_tokens": 20000,
     "id_width": 3,
