@@ -4,6 +4,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-17
+
 ### Added
 - `baton handoff` lists the D, Q and B you posted that are still open and not closed by this hand-off's `--closes` (contracts and hand-offs are left out), so settled decisions get closed instead of staying open as a record. `--keep-open ID:reason` (repeatable; MCP: `keep_open`) marks one as open on purpose and records the reason on the hand-off as an optional `keeps_open` field.
 - Project setting `handoff_own_open` in `.baton/config.json`: `"warn"` (default, a note only) or `"require"`, which refuses the hand-off until every own open D/Q/B is closed with `--closes` or listed with `--keep-open` (`--force` still overrides).
