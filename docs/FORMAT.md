@@ -58,7 +58,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `v` | integer | Format version. Absent on events written by baton 0.x, which are read as `1` |
-| `type` | `"entry"`, `"reply"` or `"close"` | Event type |
+| `type` | `"entry"`, `"reply"`, `"close"` or `"carry"` | Event type (`carry`: baton ≥ 1.11) |
 | `ev` | integer | Global event number: unique and increasing across all sprint files. It defines the order |
 | `id` | string | The thread the event belongs to (for an entry, its own id) |
 | `from` | string | The role that wrote it |
@@ -86,11 +86,13 @@ Every line of a sprint file is one event. All events carry these fields:
 
 `reply` adds `body` (string). `close` adds `reason` (string, may be empty) and, optionally (baton ≥ 1.6), `outcome`: `accepted` or `rework`, the receiver's verdict when it closes a hand-off. Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
 
+`carry` adds `reason` (string) and, optionally, `until` (string): it marks an open `Q` or `B` as carried, owed by someone outside the board. The last `carry` wins; a `close` still closes the thread.
+
 Ids look like `<kind>-<n zero-padded to id_width>`, for example `Q-007`. An imported duplicate gets the suffix `~2`, `~3` and so on.
 
 ## Folding events into threads
 
-Read every sprint file and sort the events by `ev`. Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. Events whose `id` has no entry are ignored.
+Read every sprint file and sort the events by `ev`. Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. A `carry` sets the thread's carried mark (reason, until); readers that do not know it ignore the event. Events whose `id` has no entry are ignored.
 
 ## status.json and cursors
 

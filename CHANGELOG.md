@@ -4,6 +4,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- `baton carry ID… --reason "…" [--until S3]` (MCP: `baton_carry`) marks an open question or blocker as carried: owed by someone outside the board, such as the owner. A carried thread never blocks a hand-off, `close --sprint` leaves it open (even when replied to), `baton open` tags it `carried: <reason>`, and `baton brief` lists it. `baton close` still closes it. Stored as a new `carry` event.
+- `baton handoff --keep-open ID:reason` also accepts a Q/B addressed to the sender: the thread no longer triggers the "unanswered threads addressed to you" refusal for that hand-off, is carried, and the reason is recorded in `keeps_open`.
+
 ## [1.10.0] - 2026-11-17
 
 ### Added
