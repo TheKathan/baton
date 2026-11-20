@@ -106,11 +106,12 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 self.assertRegex(ref, r"^[\w.-]+/[\w./-]+@[0-9a-f]{40} # v\d", f"{workflow.name}: {ref}")
 
     def test_tests_run_without_the_deploy_key(self):
-        self.assertIn("make test", self.jobs["test"])
+        # the Makefile's test recipe, run directly: the self-hosted runner image has no make
+        self.assertIn("unittest discover", self.jobs["test"])
         self.assertNotIn("RELEASE_DEPLOY_KEY", self.jobs["test"])
         for name, job in self.jobs.items():
             self.assertEqual("RELEASE_DEPLOY_KEY" in job, name == "release", name)
-        self.assertNotIn("make test", self.jobs["release"])
+        self.assertNotIn("unittest discover", self.jobs["release"])
         self.assertIn("needs: test", self.jobs["release"])
 
     def test_exact_tags_are_created_once_and_only_the_major_tag_moves(self):
