@@ -1,0 +1,4 @@
+self-hosted-runner:
+  # ARC scale set on coop-core (TheKathan/coop-core, k8s/apps/arc-runners).
+  labels:
+    - coop-baton

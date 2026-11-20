@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ startsWith(matrix.os, 'ubuntu') && 'coop-baton' || matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -21,4 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: make test
-      - run: pipx run ruff check src tests
+      - run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check ruff
+          python3 -m ruff check src tests
