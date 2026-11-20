@@ -20,7 +20,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
-      - run: make test
+      - name: Test (the Makefile recipe; the runner image has no make)
+        run: PYTHONPATH=src python3 -m unittest discover -s tests -v
       - run: |
           set -euo pipefail
           python3 -m pip install --disable-pip-version-check ruff

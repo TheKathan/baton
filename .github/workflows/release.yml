@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Test
-        run: make test
+        run: PYTHONPATH=src python3 -m unittest discover -s tests -v  # the Makefile recipe; no make on the runner image
 
   release:
     needs: test
