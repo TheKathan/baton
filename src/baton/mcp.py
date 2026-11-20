@@ -73,10 +73,17 @@ TOOLS = [
            "to": _STRS, "title": {"type": "string"}, "body": {"type": "string"},
            "files": _STRS, "cites": _STRS, "closes": _IDS, "force": {"type": "boolean"},
            "fixes": {**_IDS, "description": "on a fix round: the earlier hand-offs whose work this fixes"},
-           "keep_open": {**_STRS, "description": "D/Q/B you posted that stay open on purpose, each as "
+           "keep_open": {**_STRS, "description": "D/Q/B you posted, or Q/B addressed to you (then "
+                                                 "carried), that stay open on purpose, each as "
                                                  "\"ID:reason\" (who owes what)"},
            "model": _MODEL},
           ["phase", "state", "to", "title", "body"]),
+    _tool("baton_carry", "Keep an open question or blocker open on purpose, e.g. one only the owner can answer. "
+          "Carried threads never block a hand-off, `close --sprint` leaves them open, and open/brief show "
+          "them with the reason. Closing one with baton_close still works.",
+          {"role": _ROLE, "ids": _IDS, "reason": {"type": "string"},
+           "until": {"type": "string", "description": "sprint or date it is expected to be settled"}},
+          ["ids", "reason"]),
     _tool("baton_status", "The status table: one row per role. Pass role and state to set your own row.",
           {"role": _ROLE, "phase": {"type": "string"}, "state": {"type": "string"}}),
     _tool("baton_grep", "Search titles, bodies and replies.", {"text": {"type": "string"}}, ["text"]),
@@ -200,6 +207,9 @@ def _argv(name: str, a: dict, body_file: str | None) -> list[str]:
                 + ([_opt("phase", a["phase"])] if a.get("phase") else [])
                 + ([_opt("reason", a["reason"])] if a.get("reason") else [])
                 + (["--", *a["ids"]] if a.get("ids") else []))
+    if name == "baton_carry":
+        return (["carry", *role, _opt("reason", a["reason"])] + ([_opt("until", a["until"])] if a.get("until") else [])
+                + ["--", *a["ids"]])
     if name == "baton_handoff":
         out = ["handoff", *role, _opt("phase", a["phase"]), _opt("state", a["state"]), _opt("to", _csv(a["to"])),
                _opt("title", a["title"]), _opt("body-file", body_file)]

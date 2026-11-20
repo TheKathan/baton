@@ -33,7 +33,8 @@ Read at three moments only: (1) at start, (2) before you change a shared package
   baton close Q-231 --as <role> [--reason ..] close a thread you settled
   baton handoff --as <role> --phase S6-B --state "DONE pending QA" --to qa --title "..." -
       [--closes H-150]                        settle what this hand-off answers (e.g. the hand-offs you checked)
-      [--keep-open D-004:"why"]               a D/Q/B of yours that stays open on purpose
+      [--keep-open D-004:"why"]               a D/Q/B of yours, or a Q/B to you, that stays open on purpose
+  baton carry Q-194 --as <role> --reason ".."  keep a Q/B open that only the owner can answer
 
 Kinds: Q question · C contract change (needs --files) · D decision · H hand-off · B blocker.
 Blocked? post a B and tell the orchestrator directly.
@@ -84,6 +85,8 @@ def _format_event(e: dict, threads: dict) -> str:
         return (f"[{e['id']}] reply from {e['from']} · {e['ts']} (thread: {render.one_line(t)})\n"
                 + e["body"] + "\n\n")
     reason = f": {e['reason']}" if e.get("reason") else ""
+    if e["type"] == "carry":
+        return f"[{e['id']}] CARRIED by {e['from']} · {e['ts']}{reason}\n\n"
     return f"[{e['id']}] CLOSED by {e['from']} · {e['ts']}{reason}\n\n"
 
 
@@ -196,9 +199,9 @@ def _sprint_threads(board: Board, sprint: str) -> tuple[list[dict], list[dict], 
     """A sprint's open threads, split the way `close --sprint` treats them:
     (unanswered questions and blockers, live contracts, everything else = settled)."""
     rows = [t for t in board.open_threads() if t["sprint"] == sprint]
-    unanswered = [t for t in rows if _unanswered(t)]
+    unanswered = [t for t in rows if _unanswered(t) and not t.get("carried")]
     contracts = [t for t in rows if t["kind"] == "C"]
-    settled = [t for t in rows if t not in unanswered and t not in contracts]
+    settled = [t for t in rows if t not in unanswered and t not in contracts and not t.get("carried")]
     return unanswered, contracts, settled
 
 
@@ -216,6 +219,10 @@ def cmd_close(args) -> None:
             settled, contracts = settled + contracts, []
         keep = {t["id"] for t in settled}  # close in board order, as before
         ids += [t["id"] for t in board.open_threads() if t["id"] in keep and t["id"] not in ids]
+        held = [t for t in board.open_threads() if t["sprint"] == args.sprint and t.get("carried")]
+        if held:
+            print("kept open (carried on purpose; close one by id when it is decided): "
+                  + ", ".join(t["id"] for t in held))
         if unanswered:
             print("kept open (unanswered question/blocker; answer it, carry it over, or pass "
                   "--include-unanswered): " + ", ".join(t["id"] for t in unanswered))
@@ -236,6 +243,15 @@ def cmd_close(args) -> None:
         judged = args.outcome if args.outcome and board.get(i)["kind"] == "H" else ""
         e = board.close(i, _role(args), args.reason or "", judged)
         print(f"closed {e['id']}" + (f" ({judged})" if judged else ""))
+    _after_write(board)
+
+
+def cmd_carry(args) -> None:
+    board = _board(args)
+    role = _role(args)
+    for i in args.ids:
+        e = board.carry(i, role, args.reason or "", args.until or "")
+        print(f"carried {e['id']}: {e['reason']}" + (f" (until {e['until']})" if e.get("until") else ""))
     _after_write(board)
 
 
@@ -295,7 +311,8 @@ def cmd_open(args) -> None:
         now = datetime.now()
         rows = [t for t in rows if (age_hours(t, now) or 0) >= limit]
     for t in rows:
-        print(render.one_line(t) + (f" · blocks {', '.join(t['blocks'])}" if t.get("blocks") else ""))
+        tag = f" · carried: {t['carried']['reason']}" if t.get("carried") else ""
+        print(render.one_line(t) + (f" · blocks {', '.join(t['blocks'])}" if t.get("blocks") else "") + tag)
     hidden = ""
     if role and not args.all:
         n_all = len(board.open_threads(role, kinds, args.blocking)) - len(rows)
@@ -340,6 +357,27 @@ def _keep_open(board: Board, role: str, specs: list[str], skip: set[str]) -> lis
     return out
 
 
+def _keep_addressed(board: Board, role: str, specs: list[str],
+                    waiting: list[dict]) -> tuple[list[dict], list[str]]:
+    """Split `--keep-open ID:reason` specs into (those naming a Q/B addressed to the sender, the rest).
+    Such a thread is carried, so it does not block this hand-off."""
+    mine = {t["id"] for t in waiting} | {t["id"] for t in board.carried()
+                                         if role in t["to"] and t["from"] != role}
+    out, rest = [], []
+    for spec in specs:
+        tid, _, reason = spec.partition(":")
+        try:
+            tid = board.get(tid.strip())["id"]
+        except BoardError:
+            tid = ""  # _keep_open reports it
+        if tid in mine and reason.strip():
+            if all(k["id"] != tid for k in out):
+                out.append({"id": tid, "reason": reason.strip()})
+        else:
+            rest.append(spec)
+    return out, rest
+
+
 def cmd_handoff(args) -> None:
     board = _board(args)
     role, body = _role(args), _body(args)
@@ -349,6 +387,8 @@ def cmd_handoff(args) -> None:
     if n_lines > limit:
         problems.append(f"body is {n_lines} lines (max {limit}); move tables and logs to a file and link it")
     waiting = board.awaiting(role)
+    addressed, other_specs = _keep_addressed(board, role, args.keep_open or [], waiting)
+    waiting = [t for t in waiting if t["id"] not in {k["id"] for k in addressed}]
     if waiting:
         problems.append("unanswered threads addressed to you: " + ", ".join(t["id"] for t in waiting))
     if problems:
@@ -373,7 +413,7 @@ def cmd_handoff(args) -> None:
     mode = board.cfg.get("handoff_own_open", "warn")
     if mode not in ("warn", "require"):
         raise BoardError(f"handoff_own_open in .baton/config.json must be \"warn\" or \"require\", not {mode!r}")
-    kept = _keep_open(board, role, args.keep_open or [], set(to_close))
+    kept = _keep_open(board, role, other_specs, set(to_close)) + addressed
     kept_ids = {k["id"] for k in kept}
     loose = [t for t in board.own_open(role) if t["id"] not in set(to_close) | kept_ids]
     if loose and mode == "require":
@@ -392,6 +432,8 @@ def cmd_handoff(args) -> None:
     for w in board.last_warnings:
         print(f"warning: {w}", file=sys.stderr)
     board.set_status(role, args.phase, args.state, t["id"])
+    for k in addressed:  # a Q/B owed by someone outside the board: carried until it is closed
+        board.carry(k["id"], role, k["reason"])
     for i in to_close:  # settling a hand-off you received by handing on your own work accepts it
         board.close(i, role, f"settled by {t['id']}", "accepted" if board.get(i)["kind"] == "H" else "")
     _after_write(board)
@@ -611,6 +653,14 @@ def cmd_brief(args) -> None:
         if len(received) > 20:
             out.append(f"- … {len(received) - 20} more: `baton open --as {role} --kind H`")
         out.append(f"\n(`baton close <id> --as {role}`, or `--closes <ids>` on your own hand-off)\n")
+    carried = board.carried()
+    if carried:
+        out.append(f"## Carried: open on purpose, waiting on a decision ({len(carried)})\n")
+        out += [f"- {render.one_line(t)} · {t['carried']['reason']}"
+                + (f" (until {t['carried']['until']})" if t["carried"]["until"] else "") for t in carried[:20]]
+        if len(carried) > 20:
+            out.append(f"- … {len(carried) - 20} more: `baton open --all`")
+        out.append("")
     candidates = board.maybe_settled(role)
     if candidates:
         out.append("## Yours, replied to: close if settled\n")
@@ -922,6 +972,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--phase", help="close every open hand-off posted for this phase, e.g. once it passes QA")
     sp.add_argument("--reason")
 
+    sp = add("carry", cmd_carry, "keep a question/blocker open on purpose (e.g. owner decision pending)",
+             role=True)
+    sp.add_argument("ids", nargs="+")
+    sp.add_argument("--reason", required=True, help="why it stays open and who owes the answer")
+    sp.add_argument("--until", help="the sprint or date it is expected to be settled (informational)")
+
     sp = add("show", cmd_show, "print entries by id, from any sprint")
     sp.add_argument("ids", nargs="+", type=normalise_id)
 
@@ -953,7 +1009,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--closes", help="comma-separated threads this hand-off settles")
     sp.add_argument("--fixes", help="comma-separated earlier hand-offs whose work this fix round fixes")
     sp.add_argument("--keep-open", action="append", metavar="ID:reason",
-                    help="a D/Q/B you posted that stays open on purpose, with the reason (repeatable)")
+                    help="a D/Q/B you posted, or a Q/B addressed to you (it is then carried), that stays "
+                         "open on purpose, with the reason (repeatable)")
     sp.add_argument("--force", action="store_true")
     body(sp)
 

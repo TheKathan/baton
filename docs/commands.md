@@ -141,7 +141,7 @@ Closes threads that are settled.
 | `IDS` | Entry ids to close. |
 | `--reason TEXT` | Why, for example `superseded by C-210`. |
 | `--phase NAME` | Close every open hand-off posted for this phase, for example once it passes its QA gate. |
-| `--sprint NAME` | Close every settled open thread of a sprint. Unanswered `Q` and `B` and live `C` entries stay open. |
+| `--sprint NAME` | Close every settled open thread of a sprint. Unanswered `Q` and `B`, carried threads and live `C` entries stay open. |
 | `--include-unanswered` | With `--sprint`, also close unanswered questions and blockers. For imports. |
 | `--include-contracts` | With `--sprint`, also close `C` entries. For imports. |
 | `--outcome accepted\|rework` | With hand-offs: your verdict on the work you received. `rework` means it came back wrong. Closing a hand-off through `handoff --closes` records `accepted`. |
@@ -150,6 +150,22 @@ Closes threads that are settled.
 ```bash
 baton close Q-231 --as backend --reason "answered in C-240"
 baton close --phase S8-A --as orchestrator --reason "S8-A passed QA"
+```
+
+### `baton carry`
+
+Keeps an open question or blocker open on purpose, for an answer only someone outside the board can give (usually the owner). Use it instead of replying just to defer, and instead of leaving it unanswered, which blocks every hand-off.
+
+| Flag | Meaning |
+|---|---|
+| `IDS` | The `Q` or `B` entries to carry. |
+| `--reason TEXT` | Required. Why it stays open and who owes the answer. |
+| `--until NAME` | Optional: the sprint or date it is expected to be settled. Informational. |
+
+A carried thread never blocks a hand-off, `close --sprint` leaves it open even if it was replied to, `baton open` tags it `carried: <reason>`, and `baton brief` lists it. `baton close ID` closes it as usual. `baton handoff --keep-open ID:reason` on a thread addressed to you carries it too.
+
+```bash
+baton carry Q-194 --as orchestrator --reason "owner decision pending: retention period, DPIA" --until S3
 ```
 
 ### `baton handoff`
@@ -174,7 +190,7 @@ After posting, baton notes the `D`, `Q` and `B` you posted that are still open, 
 | `--title TEXT` | Required. |
 | `--files FILES`, `--cites IDS` | Affected files; cited ids. |
 | `--closes IDS` | Threads this hand-off settles, for example the hand-offs to you that you checked. |
-| `--keep-open ID:reason` | Repeatable. A `D`, `Q` or `B` you posted that stays open on purpose, with the reason (who owes what). Stored on the hand-off as `keeps_open`. |
+| `--keep-open ID:reason` | Repeatable. A `D`, `Q` or `B` you posted, or a `Q`/`B` addressed to you, that stays open on purpose, with the reason (who owes what). Stored on the hand-off as `keeps_open`. A `Q`/`B` addressed to you does not trigger the "unanswered threads addressed to you" refusal for this hand-off, and is carried (see `baton carry`). |
 | `--fixes IDS` | On a fix round: the earlier hand-offs whose work this one fixes. Each must be a hand-off. baton stores them as `fixes` and adds them to `cites`; the earlier hand-offs are left as they are. `baton metrics` counts them as *fixed later* for their sender. |
 | `--force` | Hand off despite the refusal. Give the reason in the body. |
 | `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
