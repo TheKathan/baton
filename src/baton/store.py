@@ -6,9 +6,10 @@ under that same lock, so concurrent agents can never allocate the same id.
 
 Event types:
   entry  {id, kind, n, from, to[], title, body, files[], cites[], blocks[]}
-         (optional: phase on hand-offs, supersedes[] on contracts)
+         (optional: phase, state and fixes[] on hand-offs, supersedes[] on contracts)
   reply  {id, from, body}
   close  {id, from, reason}
+  carry  {id, from, reason, until?}  (a Q/B kept open on purpose, e.g. awaiting the owner)
 Every event also carries {v, type, ev, sprint, ts}. The format is documented in
 docs/FORMAT.md; see schema.py for versioning.
 
@@ -282,7 +283,8 @@ class Board:
 
     def post(self, kind: str, author: str, to: list[str], title: str, body: str,
              files: list[str] = (), cites: list[str] = (), blocks: list[str] = (),
-             phase: str = "", supersedes: list[str] = (), state: str = "") -> dict:
+             phase: str = "", supersedes: list[str] = (), state: str = "", fixes: list[str] = (),
+             keeps_open: list[dict] = ()) -> dict:
         kind = kind.upper()
         if kind not in self.cfg["kinds"]:
             raise BoardError(f"unknown kind {kind!r}; known: {', '.join(self.cfg['kinds'])}")
@@ -304,6 +306,10 @@ class Board:
             entry["state"] = state.strip()
         if supersedes:
             entry["supersedes"] = list(supersedes)
+        if fixes:
+            entry["fixes"] = list(fixes)
+        if keeps_open:
+            entry["keeps_open"] = [dict(k) for k in keeps_open]
         refusals, self.last_warnings = policies.check(self.cfg.get("policies"), entry)
         if refusals:
             self.log_refusal("policy", author, kind, title, refusals)
@@ -336,6 +342,26 @@ class Board:
             if outcome:
                 event["outcome"] = outcome
             return self._append(event)
+
+    def carry(self, entry_id: str, author: str, reason: str, until: str = "") -> dict:
+        """Mark an open Q or B as carried: owed by someone outside the board (e.g. the owner). It never
+        blocks a hand-off and `close --sprint` leaves it open; closing it normally still works."""
+        self._check_role(author)
+        if not reason.strip():
+            raise BoardError("carry needs a reason, e.g. --reason \"owner decision pending\"")
+        with self.lock():
+            t = self.get(entry_id)
+            if t["status"] == "CLOSED":
+                raise BoardError(f"{t['id']} is already closed by {t['closed_by']}")
+            if t["kind"] not in ("Q", "B"):
+                raise BoardError(f"only a question or blocker can be carried; {t['id']} is a {t['kind']}")
+            event = {"type": "carry", "id": t["id"], "from": author, "reason": reason.strip()}
+            if until.strip():
+                event["until"] = until.strip()
+            return self._append(event)
+
+    def carried(self) -> list[dict]:
+        return [t for t in self.open_threads() if t.get("carried")]
 
     def append_raw(self, event: dict) -> dict:
         """Used by the importer: keeps the given id/n/ts/sprint and adds no `at`."""
@@ -406,6 +432,11 @@ class Board:
         return [t for t in self.open_threads(role) if t["from"] == role
                 and t["kind"] in ("Q", "B") and any(r["from"] != role for r in t["replies"])]
 
+    def own_open(self, role: str) -> list[dict]:
+        """Open D, Q and B threads the role posted. Contracts (C) and hand-offs (H) are not listed:
+        contracts stay live by design, and hand-offs are closed by their receivers."""
+        return [t for t in self.open_threads(kinds=["D", "Q", "B"]) if t["from"] == role]
+
     def handoffs_to(self, role: str) -> list[dict]:
         """Open hand-offs addressed to the role by name, from someone else."""
         return [t for t in self.open_threads(role, ["H"], named_only=True)
@@ -414,7 +445,7 @@ class Board:
     def awaiting(self, role: str) -> list[dict]:
         """Open Q/B threads addressed to the role (by name) that the role has not answered."""
         return [t for t in self.open_threads(role, ["Q", "B"], named_only=True)
-                if role in t["to"] and t["from"] != role
+                if role in t["to"] and t["from"] != role and not t.get("carried")
                 and not any(r["from"] == role for r in t["replies"])]
 
 
@@ -432,9 +463,12 @@ def fold(events: list[dict]) -> dict[str, dict]:
             threads[e["id"]] = t
     for e in events:
         t = threads.get(e.get("id"))
-        if t is None or e["type"] not in ("reply", "close"):
+        if t is None or e["type"] not in ("reply", "close", "carry"):
             continue
         t["last_ts"], t["last_at"] = e["ts"], e.get("at")
+        if e["type"] == "carry":
+            t["carried"] = {"by": e["from"], "reason": e.get("reason", ""), "until": e.get("until", "")}
+            continue
         if e["type"] == "reply":
             t["replies"].append(e)
         else:

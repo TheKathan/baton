@@ -141,7 +141,7 @@ Closes threads that are settled.
 | `IDS` | Entry ids to close. |
 | `--reason TEXT` | Why, for example `superseded by C-210`. |
 | `--phase NAME` | Close every open hand-off posted for this phase, for example once it passes its QA gate. |
-| `--sprint NAME` | Close every settled open thread of a sprint. Unanswered `Q` and `B` and live `C` entries stay open. |
+| `--sprint NAME` | Close every settled open thread of a sprint. Unanswered `Q` and `B`, carried threads and live `C` entries stay open. |
 | `--include-unanswered` | With `--sprint`, also close unanswered questions and blockers. For imports. |
 | `--include-contracts` | With `--sprint`, also close `C` entries. For imports. |
 | `--outcome accepted\|rework` | With hand-offs: your verdict on the work you received. `rework` means it came back wrong. Closing a hand-off through `handoff --closes` records `accepted`. |
@@ -150,6 +150,22 @@ Closes threads that are settled.
 ```bash
 baton close Q-231 --as backend --reason "answered in C-240"
 baton close --phase S8-A --as orchestrator --reason "S8-A passed QA"
+```
+
+### `baton carry`
+
+Keeps an open question or blocker open on purpose, for an answer only someone outside the board can give (usually the owner). Use it instead of replying just to defer, and instead of leaving it unanswered, which blocks every hand-off.
+
+| Flag | Meaning |
+|---|---|
+| `IDS` | The `Q` or `B` entries to carry. |
+| `--reason TEXT` | Required. Why it stays open and who owes the answer. |
+| `--until NAME` | Optional: the sprint or date it is expected to be settled. Informational. |
+
+A carried thread never blocks a hand-off, `close --sprint` leaves it open even if it was replied to, `baton open` tags it `carried: <reason>`, and `baton brief` lists it. `baton close ID` closes it as usual. `baton handoff --keep-open ID:reason` on a thread addressed to you carries it too.
+
+```bash
+baton carry Q-194 --as orchestrator --reason "owner decision pending: retention period, DPIA" --until S3
 ```
 
 ### `baton handoff`
@@ -163,6 +179,8 @@ baton: hand-off refused:
   (or hand off anyway with --force and the reason in the body)
 ```
 
+After posting, baton notes the `D`, `Q` and `B` you posted that are still open, other than those in `--closes` or `--keep-open`. Contracts (`C`) and hand-offs (`H`) are never listed. With `"handoff_own_open": "require"` in the config the hand-off is refused instead, and the message says to pass `--closes` or `--keep-open ID:reason`.
+
 | Flag | Meaning |
 |---|---|
 | `--as ROLE` | Your role. |
@@ -172,6 +190,8 @@ baton: hand-off refused:
 | `--title TEXT` | Required. |
 | `--files FILES`, `--cites IDS` | Affected files; cited ids. |
 | `--closes IDS` | Threads this hand-off settles, for example the hand-offs to you that you checked. |
+| `--keep-open ID:reason` | Repeatable. A `D`, `Q` or `B` you posted, or a `Q`/`B` addressed to you, that stays open on purpose, with the reason (who owes what). Stored on the hand-off as `keeps_open`. A `Q`/`B` addressed to you does not trigger the "unanswered threads addressed to you" refusal for this hand-off, and is carried (see `baton carry`). |
+| `--fixes IDS` | On a fix round: the earlier hand-offs whose work this one fixes. Each must be a hand-off. baton stores them as `fixes` and adds them to `cites`; the earlier hand-offs are left as they are. `baton metrics` counts them as *fixed later* for their sender. |
 | `--force` | Hand off despite the refusal. Give the reason in the body. |
 | `--model NAME` | The model you are. See [Which model wrote it](#which-model-wrote-it). |
 
@@ -280,7 +300,7 @@ $ baton sprint S2
 archived S1 to .baton/archive/BOARD-S1.md; current sprint is now S2
 ```
 
-When threads are still open, a second line says how many carried over. When the project has an `orchestrator` role with unread events, a note says so.
+When threads are still open, a second line says how many carried over. When the project has an `orchestrator` role with unread events, a note says so. When open questions or blockers wait only on idle roles (see *idle addressee* under [`baton metrics`](#baton-metrics), with the default 48h), a note on stderr names them and asks the orchestrator to answer, reassign or close them.
 
 The orchestrator closes a phase after its gate passes with `baton close --phase S1-A --as orchestrator`. To close a sprint: `baton unread --as orchestrator` (should end at 0), `baton close --sprint S1 --as orchestrator`, then `baton open`, which should list only live contracts and questions or blockers someone still owes, then `baton sprint S2`.
 
@@ -290,9 +310,12 @@ Board health: answer and close times, stale threads, quiet contracts, refused wr
 
 - **Stale** threads are open threads idle for at least `--stale`. Open contracts are left out: a contract stays open while it holds.
 - **Quiet contracts** are open `C` entries that nobody has replied to or cited for at least `--stale`. Check that they still hold, then supersede or close them.
+- **Idle addressee** lists open questions and blockers with no answer whose every named role (`all` aside) is idle: its status row starts with `DONE` (or it has none), and it has written no entry, reply or close for at least `--stale`. No agent for that role is running, so nobody will answer. JSON: `summary.idle_addressees`, a list of `{"id", "to"}`.
+- **Dispatch**: when the current sprint has hand-offs to the `orchestrator` but none from it, a hint says builders seem to be briefed outside the board, so the board's To pick up and In progress columns stay empty. Post `baton handoff --as orchestrator --to <role>` at dispatch. JSON: `dispatch` (`sprint`, `to_orchestrator`, `from_orchestrator`, `off_board`).
 - **Refused** counts the writes baton refused (hand-offs, contracts without files, policies) and the hand-offs forced with `--force`. It also says how many hand-offs refused on an open question were resolved by answering it. The log is `<dir>/.local/refusals.jsonl`: local to the checkout, git-ignored, and not part of the board.
 
 - **Hand-offs by role** counts the hand-offs a role sent and how the receivers judged them (`accepted`, `rework`), and:
+  - *fixed later* (`fixed_later`): its hand-offs that a later hand-off names in `--fixes`, so rework found after the receiver's verdict still shows. `accepted` and `rework` stay the receiver's own judgement;
   - *bounced*: later threads from others that cite one of its hand-offs;
   - *median hold*: from a hand-off a role received to its next hand-off;
   - *median pickup*: from a hand-off a role received to its first event after it;
@@ -350,7 +373,7 @@ A card says who must act next. Above the columns, a card per role shows its stat
 |---|---|
 | `/` | The board. |
 | `/contracts` | Live contracts by file area. `?f=new`, `old` or `touched` filters them. In a sandbox it includes the contracts of merged tasks. |
-| `/metrics` | Answer and close times, stale threads, and the load per sprint and per role. |
+| `/metrics` | Board health as a dashboard, for the current sprint by default. `?sprint=all` shows every sprint, `?sprint=<name>` one sprint; an unknown name shows the current sprint, and in a sandbox it always shows the whole task. It has a strip of key numbers (open, blockers, unanswered, stale, median first answer, close rate), a "Needs attention" list of open blockers, unanswered questions and stale threads, who owes answers and the load per role, hand-off outcomes as sender and hold and pickup as receiver, median and p90 answer and close times, every sprint's threads and median times, and events by model. Each chart has a table with the exact numbers. |
 | `/e/<id>` | One entry and its replies. |
 
 | Flag | Meaning |
@@ -481,7 +504,7 @@ Register it with `baton mcp install`. Each tool takes a `role` argument, or uses
 | `baton_post` | `baton post` | `role`, `kind`, `to`, `title`, `body`, `files`, `cites`, `blocks`, `supersedes` |
 | `baton_reply` | `baton reply` | `role`, `id`, `body`, `close` |
 | `baton_close` | `baton close` | `role`, `ids`, `reason`, `sprint`, `phase` |
-| `baton_handoff` | `baton handoff` | `role`, `phase`, `state`, `to`, `title`, `body`, `files`, `cites`, `closes`, `force` |
+| `baton_handoff` | `baton handoff` | `role`, `phase`, `state`, `to`, `title`, `body`, `files`, `cites`, `closes`, `fixes`, `force` |
 | `baton_status` | `baton status` | `role`, `phase`, `state` (set your row when `state` is given) |
 | `baton_sandbox_start` | `baton init --sandbox --task` | `task`, `roles`, `force` |
 | `baton_contracts` | `baton contracts` | `paths` |

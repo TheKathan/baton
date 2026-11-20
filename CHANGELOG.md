@@ -7,6 +7,36 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Fixed
 - The `baton serve` board shows a role as In progress whenever its status row for the current sprint says it is working, even with no open thread to link (for example, work briefed outside the board). The card reads "no open thread". Such roles used to be left off the kanban.
 
+## [1.11.0] - 2026-11-20
+
+### Added
+- `baton carry ID… --reason "…" [--until S3]` (MCP: `baton_carry`) marks an open question or blocker as carried: owed by someone outside the board, such as the owner. A carried thread never blocks a hand-off, `close --sprint` leaves it open (even when replied to), `baton open` tags it `carried: <reason>`, and `baton brief` lists it. `baton close` still closes it. Stored as a new `carry` event.
+- `baton handoff --keep-open ID:reason` also accepts a Q/B addressed to the sender: the thread no longer triggers the "unanswered threads addressed to you" refusal for that hand-off, is carried, and the reason is recorded in `keeps_open`.
+
+## [1.10.0] - 2026-11-17
+
+### Added
+- `baton handoff` lists the D, Q and B you posted that are still open and not closed by this hand-off's `--closes` (contracts and hand-offs are left out), so settled decisions get closed instead of staying open as a record. `--keep-open ID:reason` (repeatable; MCP: `keep_open`) marks one as open on purpose and records the reason on the hand-off as an optional `keeps_open` field.
+- Project setting `handoff_own_open` in `.baton/config.json`: `"warn"` (default, a note only) or `"require"`, which refuses the hand-off until every own open D/Q/B is closed with `--closes` or listed with `--keep-open` (`--force` still overrides).
+
+### Changed
+- The skill: a `D` is settled once it is implemented (cite the H) or recorded in code or docs, and its poster closes it, including a `D` addressed to `all`. Close what you settled before handing off. The orchestrator closes the D/B a hand-off implements when accepting it, and records a deferral as a `D` citing the `Q` rather than replying to the `Q`, because `close --sprint` closes replied-to questions. A denied tool or action is reported, not worked around.
+
+## [1.9.1] - 2026-11-09
+
+### Fixed
+- Rework found after a hand-off was accepted is no longer invisible. `baton handoff --fixes H-…` (MCP: `fixes`) names the earlier hand-offs a fix round fixes; each must be a hand-off. They are stored as an optional `fixes` field and added to `cites`, and the earlier hand-offs are left unchanged. `baton metrics`, `/api/metrics.json` and the `/metrics` hand-offs table ("As sender") count `fixed_later` per role. `accepted` and `rework` stay the receiver's verdict.
+- Questions to a role with no running agent no longer show only as stale. An open Q/B with no answer whose every named role shows `DONE` (or has no status row) and has written nothing for the stale time is listed in `baton metrics` ("Idle addressee", JSON `summary.idle_addressees`), in a "To an idle role" group under Needs attention on `/metrics`, and in a `baton sprint` note on stderr.
+- Work dispatched outside the board is now flagged. When the current sprint has hand-offs to the orchestrator but none from it, `baton metrics` and the `/metrics` hand-offs panel suggest posting `baton handoff --as orchestrator --to <role>` at dispatch, so To pick up and In progress fill. JSON: `dispatch`.
+- The skill: at dispatch the orchestrator posts a hand-off per brief and has builders set their status to working; fix rounds pass `--fixes`.
+- On Python 3.11, a body after a `--` separator (`baton post Q … -- "text"`) was refused as "unrecognized arguments". Words after `--` are now always body text, even when they start with `-`.
+
+## [1.9.0] - 2026-11-06
+
+### Changed
+- `/metrics` in `baton serve` is a dashboard in the same look as the board and `/contracts`: the shared top bar, nav (the current page is marked), colours and footer. It shows the current sprint by default, like the board; `?sprint=all` shows every sprint and `?sprint=<name>` one sprint, from a link row under the heading. A strip of key numbers (open, blockers, unanswered, stale, median first answer, close rate) links to a "Needs attention" list of the open blockers, unanswered questions and stale threads, each linked to its entry. Below it: per role, who owes answers and its load in the role's colour; hand-offs split into "as sender" (accepted, rework, not judged, cited later) and "as receiver" (hold, pickup); answer and close time (median and p90); board health; every sprint's threads, closes and median times; and events by model. Every number the page showed before is still there, in a compact table beside each chart, and a "How to read this" panel defines the terms. Charts are inline SVG and CSS, so the page still needs no script. An empty board says what to do first.
+- The entry page (`/e/<id>`) and the error pages use the same shell.
+
 ## [1.8.0] - 2026-11-06
 
 ### Added

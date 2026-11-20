@@ -128,15 +128,19 @@ def hand_off_stats(board: Board, scope: list[dict], known: list[str], sprint: st
 
     hold: a hand-off received to the role's next hand-off. pickup: a hand-off received to the role's
     first event after it. bounced: later threads from others that cite a hand-off the role sent.
-    accepted / rework: the verdict the receiver gave when closing a hand-off the role sent."""
+    accepted / rework: the verdict the receiver gave when closing a hand-off the role sent.
+    fixed_later: hand-offs the role sent that a later hand-off (from any sprint) names in --fixes."""
     events = [e for e in board.events() if sprint is None or e.get("sprint") == sprint]
     handoffs = sorted((t for t in scope if t["kind"] == "H"), key=lambda t: t.get("ev", 0))
+    fixers = [t for t in board.entries().values() if t["kind"] == "H" and t.get("fixes")]
     roles = set(known) | {t["from"] for t in scope} | {r for t in handoffs for r in t["to"] if r != "all"}
-    out = {r: {"handoffs_sent": 0, "accepted": 0, "rework": 0, "bounced": 0, "refused": 0, "forced": 0,
-               "hours_held": [], "hours_to_pickup": [], "models": {}} for r in roles}
+    out = {r: {"handoffs_sent": 0, "accepted": 0, "rework": 0, "fixed_later": 0, "bounced": 0, "refused": 0,
+               "forced": 0, "hours_held": [], "hours_to_pickup": [], "models": {}} for r in roles}
     for h in handoffs:
         mine = out[h["from"]]
         mine["handoffs_sent"] += 1
+        if any(h["id"] in f["fixes"] and f.get("ev", 0) > h.get("ev", 0) for f in fixers):
+            mine["fixed_later"] += 1
         outcome = h.get("closed_outcome")
         if outcome in ("accepted", "rework"):
             mine[outcome] += 1
@@ -168,6 +172,49 @@ def hand_off_stats(board: Board, scope: list[dict], known: list[str], sprint: st
         if h.get("closed_outcome") in ("accepted", "rework"):
             m[h["closed_outcome"]] += 1
     return {"roles": out, "models": by_model}
+
+
+def last_written(board: Board) -> dict[str, datetime]:
+    """Each role's latest event (entry, reply or close) on the board, any sprint."""
+    out: dict[str, datetime] = {}
+    for e in board.events():
+        when = moment(e.get("ts"), e.get("at"))
+        if when is not None and (e["from"] not in out or when > out[e["from"]]):
+            out[e["from"]] = when
+    return out
+
+
+def idle_roles(board: Board, now: datetime, stale_h: float) -> set[str]:
+    """Roles with no running agent, as far as the board can tell: the status row says DONE (or there is
+    none), and the role has written nothing for at least stale_h hours."""
+    rows, last = board.status(), last_written(board)
+    known = set(board.cfg.get("roles") or []) | set(rows) | set(last)
+    return {r for r in known
+            if (r not in rows or str(rows[r].get("state") or "").strip().upper().startswith("DONE"))
+            and (r not in last or (now - last[r]).total_seconds() / 3600 >= stale_h)}
+
+
+def idle_addressees(board: Board, threads: list[dict], now: datetime, stale_h: float) -> list[dict]:
+    """Open Q/B threads with no answer whose every named addressee (`all` aside) is idle."""
+    idle = idle_roles(board, now, stale_h)
+    out = []
+    for t in threads:
+        named = [r for r in t["to"] if r != "all"]
+        if (t["kind"] in ("Q", "B") and t["status"] == "OPEN" and named and not first_answer(t)
+                and all(r in idle for r in named)):
+            out.append({"id": t["id"], "to": named})
+    return out
+
+
+def dispatch(board: Board) -> dict:
+    """Hand-offs to and from the orchestrator in the current sprint. off_board: builders hand work to the
+    orchestrator but it posts none to them, so they are probably briefed outside the board."""
+    sprint = board.cfg["sprint"]
+    hs = [t for t in board.entries().values() if t["kind"] == "H" and t["sprint"] == sprint]
+    to_ = sum(1 for t in hs if "orchestrator" in t["to"] and t["from"] != "orchestrator")
+    from_ = sum(1 for t in hs if t["from"] == "orchestrator")
+    return {"sprint": sprint, "to_orchestrator": to_, "from_orchestrator": from_,
+            "off_board": bool(to_) and not from_}
 
 
 def _tokens(text: str) -> int:
@@ -210,7 +257,9 @@ def compute(board: Board, sprint: str | None = None, now: datetime | None = None
         "current_sprint": board.cfg["sprint"],
         "scope": sprint or "all sprints",
         "stale_hours": stale_hours,
-        "summary": {**_summary(scope, now, stale_hours, every), "refusals": refusal_stats(board, sprint)},
+        "summary": {**_summary(scope, now, stale_hours, every), "refusals": refusal_stats(board, sprint),
+                    "idle_addressees": idle_addressees(board, scope, now, stale_hours)},
+        "dispatch": dispatch(board),
         "sprints": {s: {**_summary(sprints[s], now, stale_hours, every),
                         "tokens": _tokens("".join(render.entry_md(t) for t in sprints[s]))}
                     for s in order if sprint is None or s == sprint},
@@ -238,7 +287,9 @@ def format_text(m: dict) -> str:
         + (f": {', '.join(s['stale_ids'][:10])}" + (" …" if len(s["stale_ids"]) > 10 else "") if s["stale_ids"] else ""),
         f"Quiet C        {s['quiet_contracts']} open contract(s) not replied to or cited for >= {m['stale_hours']:g}h"
         + (f": {_ids(s['quiet_contract_ids'])} (still live? supersede or close them)" if s["quiet_contract_ids"] else ""),
+        *_idle_line(s.get("idle_addressees") or []),
         _refusal_line(s["refusals"]),
+        *_dispatch_line(m.get("dispatch") or {}),
         "",
         "Sprint       threads  open  closed  answered  median 1st answer  median close  stale  ~tokens",
     ]
@@ -251,10 +302,12 @@ def format_text(m: dict) -> str:
         lines.append(f"{r:14} {x['posted']:6} {x['replies']:8} {x['asked_of']:6} {x['answered']:9}  "
                      f"{_short(x['hours_to_answer']):>13}  {x['waiting_on']:10}  {x['open_owned']:10}"
                      f"  {x['unread']} (~{x['unread_tokens']})")
-    lines += ["", "Hand-offs      sent  accepted  rework  bounced  median hold  median pickup  refused  forced  models"]
+    lines += ["", ("Hand-offs      sent  accepted  rework  fixed later  bounced  median hold  median pickup  refused"
+                   "  forced  models")]
     for r, x in m["roles"].items():
         models = ", ".join(f"{k} {v}" for k, v in sorted(x["models"].items(), key=lambda kv: -kv[1]))
-        lines.append(f"{r:14} {x['handoffs_sent']:4} {x['accepted']:9} {x['rework']:7} {x['bounced']:8}  "
+        lines.append(f"{r:14} {x['handoffs_sent']:4} {x['accepted']:9} {x['rework']:7} {x['fixed_later']:12}"
+                     f" {x['bounced']:8}  "
                      f"{_short(x['hours_held']):>11}  {_short(x['hours_to_pickup']):>13}  {x['refused']:7}  "
                      f"{x['forced']:6}  {models or '—'}")
     lines += ["", "Model                    events  hand-offs  accepted  rework"]
@@ -265,6 +318,25 @@ def format_text(m: dict) -> str:
 
 def _ids(ids: list[str]) -> str:
     return ", ".join(ids[:10]) + (" …" if len(ids) > 10 else "")
+
+
+def idle_text(items: list[dict]) -> str:
+    """'Q-062 (docs), B-070 (qa, docs)': idle-addressee threads with the roles they wait on."""
+    return ", ".join(f"{x['id']} ({', '.join(x['to'])})" for x in items[:10]) + (" …" if len(items) > 10 else "")
+
+
+def _idle_line(items: list[dict]) -> list[str]:
+    if not items:
+        return []
+    return [f"Idle addressee  {len(items)} open question(s) to a role with no running agent: {idle_text(items)}"]
+
+
+def _dispatch_line(d: dict) -> list[str]:
+    if not d.get("off_board"):
+        return []
+    return [(f"Dispatch       {d['to_orchestrator']} hand-off(s) to the orchestrator in {d['sprint']}, none from it: "
+             "builders seem briefed outside the board; post `baton handoff --as orchestrator --to <role>` at "
+             "dispatch so the board shows the work")]
 
 
 def _refusal_line(r: dict) -> str:

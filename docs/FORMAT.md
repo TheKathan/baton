@@ -43,6 +43,7 @@ A JSON object. Missing keys take these defaults:
 | `kinds` | object, kind letter → label | `Q`, `C`, `D`, `H`, `B` |
 | `roles` | array of strings (empty = any) | `[]` |
 | `handoff_max_lines` | integer | `20` |
+| `handoff_own_open` | `"warn"` or `"require"` | `"warn"` |
 | `body_warn_lines` | object, kind → integer | `{"C": 40, "D": 40}` |
 | `unread_warn_tokens` | integer (0 = off) | `20000` |
 | `id_width` | integer | `3` |
@@ -57,7 +58,7 @@ Every line of a sprint file is one event. All events carry these fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `v` | integer | Format version. Absent on events written by baton 0.x, which are read as `1` |
-| `type` | `"entry"`, `"reply"` or `"close"` | Event type |
+| `type` | `"entry"`, `"reply"`, `"close"` or `"carry"` | Event type (`carry`: baton ≥ 1.11) |
 | `ev` | integer | Global event number: unique and increasing across all sprint files. It defines the order |
 | `id` | string | The thread the event belongs to (for an entry, its own id) |
 | `from` | string | The role that wrote it |
@@ -77,17 +78,21 @@ Every line of a sprint file is one event. All events carry these fields:
 | `files`, `cites`, `blocks` | arrays of strings | Affected files (required for `C`), cited ids, and what the entry blocks |
 | `phase` | string | Optional (baton ≥ 1.3): on `H` entries, the `--phase` of the hand-off |
 | `state` | string | Optional (baton ≥ 1.6): on `H` entries, the `--state` of the hand-off, for example `DONE pending QA` |
+| `keeps_open` | array of objects `{"id", "reason"}` | Optional (baton ≥ 1.10): on `H` entries, the sender's own open D/Q/B threads kept open on purpose (`handoff --keep-open`). The threads are not changed |
+| `fixes` | array of strings | Optional (baton ≥ 1.9.1): on `H` entries, the earlier hand-offs whose work this fix round fixes (`handoff --fixes`). They are also in `cites`; the earlier hand-offs are not changed |
 | `supersedes` | array of strings | Optional (baton ≥ 1.3): on `C` entries, the contracts this one replaces. baton closes them in the same command |
 | `status` | `"OPEN"` or `"CLOSED"` | Optional; the starting state of an imported entry (default `OPEN`) |
 | `imported`, `imported_header` | boolean, string | Optional; set by `baton import` |
 
 `reply` adds `body` (string). `close` adds `reason` (string, may be empty) and, optionally (baton ≥ 1.6), `outcome`: `accepted` or `rework`, the receiver's verdict when it closes a hand-off. Replies and closes created by `baton import` (from `> [A]` answer lines and `status: CLOSED` markers) also carry `"imported": true`.
 
+`carry` adds `reason` (string) and, optionally, `until` (string): it marks an open `Q` or `B` as carried, owed by someone outside the board. The last `carry` wins; a `close` still closes the thread.
+
 Ids look like `<kind>-<n zero-padded to id_width>`, for example `Q-007`. An imported duplicate gets the suffix `~2`, `~3` and so on.
 
 ## Folding events into threads
 
-Read every sprint file and sort the events by `ev`. Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. Events whose `id` has no entry are ignored.
+Read every sprint file and sort the events by `ev`. Each `entry` starts a thread. Each `reply` with the same `id` is appended to it. A `close` marks it `CLOSED`, and the last `close` wins. A `carry` sets the thread's carried mark (reason, until); readers that do not know it ignore the event. Events whose `id` has no entry are ignored.
 
 ## status.json and cursors
 
